@@ -1,103 +1,136 @@
-import * as Dialog from "@radix-ui/react-dialog";
-import { type FC, useState } from "react";
+import { FiPlus } from "solid-icons/fi";
+import { createSignal, Errored, For, Loading, Show, useContext } from "solid-js";
 
-import { useTabs } from "../api/tabs";
-import { useAddTabToPlaylist } from "../hooks/useAddTabToPlaylist";
-import { useUpsertTab } from "../hooks/useUpsertTab";
+import { addTabToPlaylist } from "../api/playlists";
+import { upsertTab } from "../api/tabs";
+import { DisplayContext } from "../app/display";
+import { FIELD, FIELD_LABEL, PRIMARY_BUTTON, readText, SECONDARY_BUTTON } from "./controls";
+import { Modal } from "./Modal";
 
-export const AddTabDialog: FC<{ playlistId: string; }> = ({ playlistId }) => {
-  const [open, setOpen] = useState(false);
-  const [tabId, setTabId] = useState("");
-  const [name, setName] = useState("");
-  const [url, setUrl] = useState("");
+export const AddTabDialog = (properties: { playlistId: string; playlistName: string; }) => {
+  const display = useContext(DisplayContext);
+  const [isOpen, setIsOpen] = createSignal(false);
+  const [isSubmitting, setIsSubmitting] = createSignal(false);
+  const [failure, setFailure] = createSignal<string | null>(null);
+  let form: HTMLFormElement | undefined;
 
-  const { data: existing = [] } = useTabs();
-  const addToPlaylist = useAddTabToPlaylist({ onSuccess: () => setOpen(false) });
-  const upsert = useUpsertTab({
-    onSuccess: created => addToPlaylist.mutate({ playlistId, tabId: created }),
-  });
+  const unused = () => {
+    const inPlaylist = display.playlistTabs().get(properties.playlistId) ?? [];
 
-  const unused = existing.filter(tab => tab.tab_id !== tabId);
+    return display.tabs().filter(tab => inPlaylist.every(member => member.tab_id !== tab.tab_id));
+  };
 
-  const submit = () => {
-    if (tabId && url) {
-      upsert.mutate({ tabId, name: name || undefined, url });
-    }
+  const close = () => {
+    setIsOpen(false);
+    setFailure(null);
+    form?.reset();
+  };
+
+  const add = async (tabId: string) => {
+    const result = await display.apply(
+      async () => addTabToPlaylist(properties.playlistId, tabId),
+      ["playlistTabs", "playlists"],
+    );
+
+    if (result.ok) close();
+    else setFailure(result.message);
+  };
+
+  const submit = async (event: SubmitEvent & { currentTarget: HTMLFormElement; }) => {
+    event.preventDefault();
+
+    const fields = new FormData(event.currentTarget);
+    const tabId = readText(fields, "tab_id");
+    const name = readText(fields, "name");
+
+    setIsSubmitting(true);
+
+    const result = await display.apply(
+      async () => upsertTab(tabId, { url: readText(fields, "url"), ...(name !== "" && { name }) }),
+      ["tabs", "playlistTabs"],
+    );
+
+    if (result.ok) await add(tabId);
+    else setFailure(result.message);
+
+    setIsSubmitting(false);
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger className="bg-gray-800 px-2 py-1 text-sm text-gray-100 hover:bg-gray-700">
+    <>
+      <button type="button" onClick={() => setIsOpen(true)} class={SECONDARY_BUTTON}>
+        <FiPlus size={14} aria-hidden="true" />
         Add tab
-      </Dialog.Trigger>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/60" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 w-[32rem] -translate-x-1/2 -translate-y-1/2 border border-gray-800 bg-gray-950 p-5">
-          <Dialog.Title className="mb-4 font-semibold text-gray-100">
-            Add a tab to this playlist
-          </Dialog.Title>
-
-          {unused.length > 0 && (
-            <div className="mb-4">
-              <p className="mb-1 text-xs text-gray-500">Existing tabs</p>
-              <div className="flex flex-wrap gap-2">
-                {unused.map(tab => (
-                  <button
-                    key={tab.tab_id}
-                    type="button"
-                    onClick={() => addToPlaylist.mutate({ playlistId, tabId: tab.tab_id })}
-                    className="bg-gray-800 px-2 py-1 text-sm text-gray-200 hover:bg-gray-700"
-                  >
-                    {tab.name}
-                  </button>
-                ))}
+      </button>
+      <Modal title={`Add a tab to ${properties.playlistName}`} isOpen={isOpen()} onClose={close}>
+        <Errored fallback={null}>
+          <Loading fallback={null}>
+            <Show when={unused().length > 0}>
+              <div class="space-y-1.5">
+                <p class={FIELD_LABEL}>Existing tabs</p>
+                <div class="flex flex-wrap gap-2">
+                  <For each={unused()} keyed={tab => tab.tab_id}>
+                    {tab => (
+                      <button type="button" onClick={() => void add(tab().tab_id)} class={SECONDARY_BUTTON}>
+                        {tab().name}
+                      </button>
+                    )}
+                  </For>
+                </div>
               </div>
-            </div>
-          )}
-
-          <fieldset className="flex flex-col gap-3">
-            <label className="text-sm text-gray-400">
-              Tab id
-              <input
-                value={tabId}
-                onChange={event => setTabId(event.target.value)}
-                placeholder="overview"
-                className="mt-1 w-full border border-gray-800 bg-gray-900 px-2 py-1 text-gray-100"
-              />
-            </label>
-            <label className="text-sm text-gray-400">
-              Name
-              <input
-                value={name}
-                onChange={event => setName(event.target.value)}
-                placeholder="Overview"
-                className="mt-1 w-full border border-gray-800 bg-gray-900 px-2 py-1 text-gray-100"
-              />
-            </label>
-            <label className="text-sm text-gray-400">
-              URL
-              <input
-                value={url}
-                onChange={event => setUrl(event.target.value)}
-                placeholder="https://grafana.example.com/d/overview?kiosk"
-                className="mt-1 w-full border border-gray-800 bg-gray-900 px-2 py-1 text-gray-100"
-              />
-            </label>
-          </fieldset>
-
-          <div className="mt-5 flex justify-end gap-2">
-            <Dialog.Close className="px-3 py-1 text-sm text-gray-400">Cancel</Dialog.Close>
-            <button
-              type="button"
-              onClick={submit}
-              disabled={!tabId || !url}
-              className="bg-emerald-700 px-3 py-1 text-sm text-white disabled:opacity-50"
-            >
-              Add
+            </Show>
+          </Loading>
+        </Errored>
+        <form
+          ref={(element) => {
+            form = element;
+          }}
+          class="space-y-4"
+          onSubmit={event => void submit(event)}
+        >
+          <div class="space-y-1">
+            <label for={`${properties.playlistId}-tab-id`} class={FIELD_LABEL}>Tab id</label>
+            <input
+              id={`${properties.playlistId}-tab-id`}
+              name="tab_id"
+              type="text"
+              required
+              placeholder="overview"
+              class={FIELD}
+            />
+          </div>
+          <div class="space-y-1">
+            <label for={`${properties.playlistId}-tab-name`} class={FIELD_LABEL}>Name (optional)</label>
+            <input
+              id={`${properties.playlistId}-tab-name`}
+              name="name"
+              type="text"
+              placeholder="Overview"
+              class={FIELD}
+            />
+          </div>
+          <div class="space-y-1">
+            <label for={`${properties.playlistId}-tab-url`} class={FIELD_LABEL}>URL</label>
+            <input
+              id={`${properties.playlistId}-tab-url`}
+              name="url"
+              type="text"
+              required
+              placeholder="https://grafana.example.com/d/overview?kiosk"
+              class={FIELD}
+            />
+          </div>
+          <Show when={failure()}>
+            {message => <p class="text-sm text-red-600 dark:text-red-400" role="alert">{message()}</p>}
+          </Show>
+          <div class="flex justify-end gap-2">
+            <button type="button" onClick={close} class={SECONDARY_BUTTON}>Cancel</button>
+            <button type="submit" disabled={isSubmitting()} class={PRIMARY_BUTTON}>
+              {isSubmitting() ? "Adding..." : "Add tab"}
             </button>
           </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+        </form>
+      </Modal>
+    </>
   );
 };

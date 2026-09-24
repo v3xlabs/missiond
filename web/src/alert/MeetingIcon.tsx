@@ -1,11 +1,11 @@
-import classNames from "classnames";
-import { type FC } from "react";
-import { LuVideo } from "react-icons/lu";
-import { SiGooglemeet, SiJitsi, SiWebex, SiZoom } from "react-icons/si";
+import { Dynamic } from "@solidjs/web";
+import type { IconTypes } from "solid-icons";
+import { FiVideo } from "solid-icons/fi";
+import { SiGooglemeet, SiJitsi, SiWebex, SiZoom } from "solid-icons/si";
 
-import type { Alert } from "./useAlerts";
+import type { Alert } from "./feed";
 
-const icons: Record<string, FC<{ className?: string; }>> = {
+const icons: Record<string, IconTypes> = {
   zoom: SiZoom,
   meet: SiGooglemeet,
   jitsi: SiJitsi,
@@ -19,17 +19,14 @@ const brand: Record<string, string> = {
   webex: "text-[#00bceb]",
 };
 
-export const MeetingIcon: FC<{ meeting: NonNullable<Alert["meeting"]>; className?: string; }> = ({
-  meeting,
-  className,
-}) => {
-  const provider = meeting.provider ?? "";
-  const Icon = icons[provider] ?? LuVideo;
-
-  return (
-    <Icon
-      className={classNames(brand[provider] ?? "text-gray-500", className)}
-      aria-label={provider || "meeting"}
-    />
-  );
-};
+// The icon package types its props against Solid 1's JSX, which has no `class`, so the size and
+// colour sit on a wrapper the icon fills.
+export const MeetingIcon = (properties: { meeting: NonNullable<Alert["meeting"]>; class: string; }) => (
+  <span
+    role="img"
+    aria-label={properties.meeting.provider ?? "meeting"}
+    class={["inline-flex", brand[properties.meeting.provider ?? ""] ?? "text-gray-500", properties.class]}
+  >
+    <Dynamic component={icons[properties.meeting.provider ?? ""] ?? FiVideo} size="100%" aria-hidden="true" />
+  </span>
+);

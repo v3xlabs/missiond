@@ -1,120 +1,161 @@
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import * as Switch from "@radix-ui/react-switch";
-import { type FC } from "react";
-import { FiExternalLink, FiRefreshCw, FiRotateCw, FiTrash2 } from "react-icons/fi";
+import { FiExternalLink, FiRefreshCw, FiRotateCw, FiTrash2 } from "solid-icons/fi";
+import { TbOutlineGripVertical } from "solid-icons/tb";
+import { Show, useContext } from "solid-js";
 
-import type { components } from "../api/schema.gen";
-import { useActivateTab } from "../hooks/useActivateTab";
-import { useRecreateTab } from "../hooks/useRecreateTab";
-import { useRefreshTab } from "../hooks/useRefreshTab";
-import { useRemoveTabFromPlaylist } from "../hooks/useRemoveTabFromPlaylist";
-import { useSetTabEnabled } from "../hooks/useSetTabEnabled";
+import { activateTab, removeTabFromPlaylist, setTabEnabled } from "../api/playlists";
+import type { TabInfo } from "../api/tabs";
+import { recreateTab, refreshTab } from "../api/tabs";
+import { DisplayContext } from "../app/display";
+import { DANGER_ICON_BUTTON, ICON_BUTTON } from "./controls";
 import { TabPreview } from "./TabPreview";
 
-type TabInfo = components["schemas"]["TabInfo"];
-
-type Properties = {
+export const TabCard = (properties: {
   tab: TabInfo;
   playlistId: string;
   isOnScreen: boolean;
-};
-
-export const TabCard: FC<Properties> = ({ tab, playlistId, isOnScreen }) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    // eslint-disable-next-line no-restricted-syntax -- dnd-kit names this field.
-    id: tab.tab_id,
-  });
-
-  const activate = useActivateTab();
-  const refresh = useRefreshTab();
-  const recreate = useRecreateTab();
-  const setEnabled = useSetTabEnabled();
-  const remove = useRemoveTabFromPlaylist();
+  isDragged: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onDrop: () => void;
+  /** Moves the tab by this many places, for the keyboard. */
+  onMove: (offset: number) => void;
+}) => {
+  const display = useContext(DisplayContext);
 
   return (
-    <article
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={[
-        "flex w-72 shrink-0 flex-col gap-2 border p-3",
-        isOnScreen ? "border-emerald-500" : "border-gray-800",
-        isDragging ? "opacity-50" : "",
-        tab.enabled ? "" : "opacity-60",
-      ].join(" ")}
-    >
-      <div className="flex items-start gap-2">
-        <button
-          type="button"
-          className="cursor-grab text-gray-500"
-          aria-label="Reorder tab"
-          {...attributes}
-          {...listeners}
-        >
-          ⠿
-        </button>
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate font-medium text-gray-100">{tab.name}</h3>
-          <p className="truncate text-xs text-gray-500">{tab.url ?? "camera"}</p>
-        </div>
-        <Switch.Root
-          checked={tab.enabled}
-          onCheckedChange={enabled => setEnabled.mutate({
-            playlistId,
-            tabId: tab.tab_id,
-            enabled,
-          })}
-          className="h-5 w-9 shrink-0 bg-gray-700 data-[state=checked]:bg-emerald-600"
-          aria-label={tab.enabled ? "Disable tab" : "Enable tab"}
-        >
-          <Switch.Thumb className="block h-4 w-4 translate-x-0.5 bg-white transition-transform data-[state=checked]:translate-x-4" />
-        </Switch.Root>
-      </div>
+    <li
+      draggable="true"
+      onDragStart={(event) => {
+        // Firefox starts no drag without data.
+        event.dataTransfer?.setData("text/plain", properties.tab.tab_id);
 
+        if (event.dataTransfer !== null) event.dataTransfer.effectAllowed = "move";
+
+        properties.onDragStart();
+      }}
+      onDragEnd={() => properties.onDragEnd()}
+      onDragOver={event => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault();
+        properties.onDrop();
+      }}
+      class={["w-64 shrink-0 space-y-2", { "opacity-40": properties.isDragged, "opacity-60": !properties.tab.enabled }]}
+    >
       <button
         type="button"
-        onClick={() => activate.mutate({ playlistId, tabId: tab.tab_id })}
-        className="relative block aspect-video w-full overflow-hidden bg-gray-900"
+        onClick={() => void display.change(async () => activateTab(properties.playlistId, properties.tab.tab_id), ["status"])}
         title="Put this tab on screen"
+        class={[
+          "relative block aspect-video w-full overflow-hidden rounded-control bg-raised",
+          { "ring-2 ring-emerald-500 ring-offset-2 ring-offset-surface": properties.isOnScreen },
+        ]}
       >
-        {tab.url === undefined
-          ? (
-              <span className="absolute inset-0 flex items-center justify-center px-3 text-center text-xs text-gray-500">
-                a camera is played outside the browser and has no preview
-              </span>
-            )
-          : <TabPreview tabId={tab.tab_id} />}
-        {isOnScreen && (
-          <span className="absolute top-1 left-1 bg-emerald-600 px-1.5 py-0.5 text-xs text-white">
-            on screen
-          </span>
-        )}
+        <Show
+          when={properties.tab.url !== undefined}
+          fallback={(
+            <span class="absolute inset-0 flex items-center justify-center px-3 text-center text-xs text-slate-500 dark:text-slate-400">
+              A camera plays outside the browser and has no preview
+            </span>
+          )}
+        >
+          <TabPreview tabId={properties.tab.tab_id} />
+        </Show>
       </button>
 
-      <div className="flex items-center gap-3 text-gray-400">
-        {tab.url !== undefined && (
-          <>
-            <button type="button" onClick={() => refresh.mutate(tab.tab_id)} title="Reload the page">
-              <FiRefreshCw />
-            </button>
-            <button type="button" onClick={() => recreate.mutate(tab.tab_id)} title="Close and reopen the page">
-              <FiRotateCw />
-            </button>
-            <a href={tab.url} target="_blank" rel="noreferrer" title="Open in this browser">
-              <FiExternalLink />
-            </a>
-          </>
-        )}
-        <span className="flex-1" />
+      <div class="flex items-start gap-1">
         <button
           type="button"
-          onClick={() => remove.mutate({ playlistId, tabId: tab.tab_id })}
-          title="Remove from this playlist"
-          className="hover:text-red-400"
+          onKeyDown={(event) => {
+            if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") {
+              return;
+            }
+
+            event.preventDefault();
+            properties.onMove(event.key === "ArrowLeft" ? -1 : 1);
+          }}
+          aria-label={`Reorder ${properties.tab.name}`}
+          aria-keyshortcuts="ArrowLeft ArrowRight"
+          title="Drag to reorder, or focus and use the arrow keys"
+          class={[ICON_BUTTON, "cursor-grab"]}
         >
-          <FiTrash2 />
+          <TbOutlineGripVertical size={14} aria-hidden="true" />
+        </button>
+        <div class="min-w-0 flex-1">
+          <h3 class="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{properties.tab.name}</h3>
+          <p class="truncate text-xs text-slate-500 dark:text-slate-500">
+            <Show when={properties.isOnScreen} fallback={properties.tab.url ?? "Camera"}>
+              <span class="text-emerald-700 dark:text-emerald-400">On screen</span>
+            </Show>
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={properties.tab.enabled ? "true" : "false"}
+          aria-label={`Play ${properties.tab.name} in this playlist`}
+          title={properties.tab.enabled ? "In rotation" : "Skipped in rotation"}
+          onClick={() => void display.change(
+            async () => setTabEnabled(properties.playlistId, properties.tab.tab_id, !properties.tab.enabled),
+            ["playlistTabs"],
+          )}
+          class={[
+            "mt-1 flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors",
+            properties.tab.enabled ? "bg-emerald-600" : "bg-raised-hover",
+          ]}
+        >
+          <span class={["size-4 rounded-full bg-white shadow-sm transition-transform", { "translate-x-4": properties.tab.enabled }]} />
         </button>
       </div>
-    </article>
+
+      <div class="flex items-center gap-1">
+        <Show when={properties.tab.url}>
+          {url => (
+            <>
+              <button
+                type="button"
+                onClick={() => void display.change(async () => refreshTab(properties.tab.tab_id), [])}
+                aria-label="Reload the page"
+                title="Reload the page"
+                class={ICON_BUTTON}
+              >
+                <FiRefreshCw size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={() => void display.change(async () => recreateTab(properties.tab.tab_id), [])}
+                aria-label="Close and reopen the page"
+                title="Close and reopen the page"
+                class={ICON_BUTTON}
+              >
+                <FiRotateCw size={14} aria-hidden="true" />
+              </button>
+              <a
+                href={url()}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Open in this browser"
+                title="Open in this browser"
+                class={ICON_BUTTON}
+              >
+                <FiExternalLink size={14} aria-hidden="true" />
+              </a>
+            </>
+          )}
+        </Show>
+        <span class="flex-1" />
+        <button
+          type="button"
+          onClick={() => void display.change(
+            async () => removeTabFromPlaylist(properties.playlistId, properties.tab.tab_id),
+            ["playlistTabs", "playlists"],
+          )}
+          aria-label="Remove from this playlist"
+          title="Remove from this playlist"
+          class={DANGER_ICON_BUTTON}
+        >
+          <FiTrash2 size={14} aria-hidden="true" />
+        </button>
+      </div>
+    </li>
   );
 };

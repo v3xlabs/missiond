@@ -4,3 +4,9 @@ allowBuilds:
   unrs-resolver: true
 minimumReleaseAgeExclude:
   - eslint@10.9.1
+
+# The vite plugin depends on the compiler with a caret, which resolves past the pinned
+# runtime. A newer compiler emits calls the rc.3 runtime does not export.
+overrides:
+  "@solidjs/babel-plugin": 2.0.0-rc.3
+  "@solidjs/compiler": 2.0.0-rc.3

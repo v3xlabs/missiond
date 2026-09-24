@@ -1,5 +1,4 @@
-import classNames from "classnames";
-import { type FC } from "react";
+import { For, Show } from "solid-js";
 
 import { clock } from "./clock";
 import { MeetingIcon } from "./MeetingIcon";
@@ -31,51 +30,55 @@ const tones: Record<Nearness, Tone> = {
   },
 };
 
-export const RailEntry: FC<{ entry: Placed; from: number; spanMs: number; now: number; }> = ({
-  entry,
-  from,
-  spanMs,
-  now,
-}) => {
-  const nearness = nearnessOf(entry.startsAt, now);
-  const tone = tones[nearness];
-  const { alert } = entry;
+export const RailEntry = (properties: { entry: Placed; from: number; spanMs: number; now: number; }) => {
+  const nearness = () => nearnessOf(properties.entry.startsAt, properties.now);
 
-  const details = [];
+  const details = () => {
+    const entry = properties.entry;
+    const lines: string[] = [];
 
-  if (nearness === "starting") {
-    details.push(`in ${Math.max(1, Math.round((entry.startsAt - now) / 60_000))} min`);
-  }
+    if (nearness() === "starting") {
+      lines.push(`in ${Math.max(1, Math.round((entry.startsAt - properties.now) / 60_000))} min`);
+    }
 
-  details.push(
-    entry.endsAt > entry.startsAt
-      ? `${clock.format(entry.startsAt)} to ${clock.format(entry.endsAt)}`
-      : clock.format(entry.startsAt),
-  );
+    lines.push(
+      entry.endsAt > entry.startsAt
+        ? `${clock.format(entry.startsAt)} to ${clock.format(entry.endsAt)}`
+        : clock.format(entry.startsAt),
+    );
 
-  if (alert.location) {
-    details.push(alert.location);
-  }
+    if (entry.alert.location) {
+      lines.push(entry.alert.location);
+    }
+
+    return lines;
+  };
+
+  const top = () => percentOf(properties.entry.startsAt, properties.from, properties.spanMs);
 
   return (
     <li
-      className="rail-entry absolute"
+      class="rail-entry absolute"
       style={{
-        top: `${percentOf(entry.startsAt, from, spanMs)}%`,
-        height: `${percentOf(entry.endsAt, from, spanMs) - percentOf(entry.startsAt, from, spanMs)}%`,
-        left: `${(entry.lane / entry.lanes) * 100}%`,
-        width: `${(1 / entry.lanes) * 100}%`,
+        "top": `${top()}%`,
+        "height": `${percentOf(properties.entry.endsAt, properties.from, properties.spanMs) - top()}%`,
+        "left": `${(properties.entry.lane / properties.entry.lanes) * 100}%`,
+        "width": `${(1 / properties.entry.lanes) * 100}%`,
         // A quarter of an hour is four pixels of honest height, and no title fits in four pixels.
-        minHeight: "2.6em",
+        "min-height": "2.6em",
       }}
     >
-      <div className={classNames("mr-[0.3em] mb-[0.15em] h-full overflow-hidden px-[0.6em] py-[0.3em]", tone.surface)}>
-        <div className="flex items-center gap-[0.45em]">
-          {alert.meeting && <MeetingIcon meeting={alert.meeting} className="size-[1.1em] shrink-0" />}
-          <h2 className={classNames("truncate text-[1.05em] font-semibold", tone.title)}>{alert.title}</h2>
+      <div class={["mr-[0.3em] mb-[0.15em] h-full overflow-hidden px-[0.6em] py-[0.3em]", tones[nearness()].surface]}>
+        <div class="flex items-center gap-[0.45em]">
+          <Show when={properties.entry.alert.meeting}>
+            {meeting => <MeetingIcon meeting={meeting()} class="size-[1.1em] shrink-0" />}
+          </Show>
+          <h2 class={["truncate text-[1.05em] font-semibold", tones[nearness()].title]}>{properties.entry.alert.title}</h2>
         </div>
-        <p className={classNames("rail-entry-detail mt-[0.1em] gap-[0.7em] text-[0.8em] tabular-nums", tone.meta)}>
-          {details.map(detail => <span key={detail} className="truncate">{detail}</span>)}
+        <p class={["rail-entry-detail mt-[0.1em] gap-[0.7em] text-[0.8em] tabular-nums", tones[nearness()].meta]}>
+          <For each={details()}>
+            {detail => <span class="truncate">{detail}</span>}
+          </For>
         </p>
       </div>
     </li>

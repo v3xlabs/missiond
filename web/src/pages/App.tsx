@@ -1,20 +1,25 @@
-import { type FC } from "react";
-
+import { createDisplay, DisplayContext } from "../app/display";
+import { Header } from "../components/Header";
 import { Notices } from "../components/Notices";
-import { StatusBar } from "../components/StatusBar";
-import { useDisplayEvents } from "../hooks/useDisplayEvents";
+import { NowPlaying } from "../components/NowPlaying";
 import { PlaylistList } from "../sections/PlaylistList";
 import { TabList } from "../sections/TabList";
 
-export const App: FC = () => {
-  useDisplayEvents();
+export const App = () => {
+  // Built once here: a call written into the prop would become a getter that builds anew on each read.
+  const display = createDisplay();
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100">
-      <StatusBar />
-      <PlaylistList />
-      <TabList />
-      <Notices />
-    </div>
+    <DisplayContext value={display}>
+      <div class="min-h-screen text-slate-900 dark:text-slate-100">
+        <Header />
+        <main class="mx-auto max-w-6xl space-y-8 px-6 py-8">
+          <NowPlaying />
+          <PlaylistList />
+          <TabList />
+        </main>
+        <Notices />
+      </div>
+    </DisplayContext>
   );
 };

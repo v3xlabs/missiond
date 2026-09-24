@@ -1,3 +1,4 @@
 .idea/
 .dev-chromium-profile/
 .tmp/
+.pnpm-store/
