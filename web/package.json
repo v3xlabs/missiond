@@ -20,13 +20,13 @@
     "@solidjs/vite-plugin": "3.0.0-next.35",
     "@tailwindcss/postcss": "^4.3.3",
     "@tailwindcss/vite": "^4.3.3",
-    "autoprefixer": "^10.4.17",
-    "eslint": "^10.9.1",
+    "autoprefixer": "^10.6.1",
+    "eslint": "^10.11.0",
     "eslint-plugin-v3xlabs": "^1.8.1",
-    "openapi-typescript": "^7.9.1",
-    "postcss": "^8.4.34",
+    "openapi-typescript": "^7.13.0",
+    "postcss": "^8.5.28",
     "tailwindcss": "^4.3.3",
-    "typescript": "^5.9.2",
+    "typescript": "^5.9.3",
     "vite": "^8.3.0"
   },
   "type": "module"
