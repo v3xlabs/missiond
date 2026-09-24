@@ -1,35 +1,31 @@
-import { type FC } from "react";
+import { Errored, For, Loading, Show, useContext } from "solid-js";
 
-import { usePlaylists } from "../api/playlists";
+import { DisplayContext } from "../app/display";
+import { EMPTY_PANEL, SECTION_HEADING } from "../components/controls";
 import { CreatePlaylistDialog } from "../components/CreatePlaylistDialog";
 import { PlaylistCard } from "../components/PlaylistCard";
-import { ScreenPanel } from "../components/ScreenPanel";
+import { RegionFailure, RegionPending } from "../components/Region";
 
-export const PlaylistList: FC = () => {
-  const { data: playlists, isLoading, error } = usePlaylists();
-
-  if (isLoading) {
-    return <p className="p-4 text-gray-500">Loading playlists...</p>;
-  }
-
-  if (error || !playlists) {
-    return <p className="p-4 text-red-400">Could not load playlists.</p>;
-  }
+export const PlaylistList = () => {
+  const display = useContext(DisplayContext);
 
   return (
-    <div className="flex flex-col gap-6 p-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-100">Playlists</h2>
+    <section class="space-y-3" aria-labelledby="playlists-heading">
+      <div class="flex items-center justify-between gap-4">
+        <h2 id="playlists-heading" class={SECTION_HEADING}>Playlists</h2>
         <CreatePlaylistDialog />
       </div>
-
-      <ScreenPanel />
-
-      {playlists.length === 0
-        ? <p className="text-gray-500">No playlists configured.</p>
-        : playlists.map(playlist => (
-            <PlaylistCard key={playlist.playlist_id} playlist={playlist} />
-          ))}
-    </div>
+      <Errored fallback={(error, reset) => <RegionFailure error={error()} retry={reset} />}>
+        <Loading fallback={<RegionPending label="Loading playlists" />}>
+          <Show when={display.playlists().length > 0} fallback={<p class={EMPTY_PANEL}>No playlists configured.</p>}>
+            <div class="space-y-4">
+              <For each={display.playlists()} keyed={playlist => playlist.playlist_id}>
+                {playlist => <PlaylistCard playlist={playlist()} />}
+              </For>
+            </div>
+          </Show>
+        </Loading>
+      </Errored>
+    </section>
   );
 };

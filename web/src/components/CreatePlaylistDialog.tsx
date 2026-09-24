@@ -1,76 +1,104 @@
-import * as Dialog from "@radix-ui/react-dialog";
-import { type FC, useState } from "react";
+import { FiPlus } from "solid-icons/fi";
+import { createSignal, Show, useContext } from "solid-js";
 
-import { useCreatePlaylist } from "../hooks/useCreatePlaylist";
+import { createPlaylist } from "../api/playlists";
+import { DisplayContext } from "../app/display";
+import { FIELD, FIELD_LABEL, PRIMARY_BUTTON, readText, SECONDARY_BUTTON } from "./controls";
+import { Modal } from "./Modal";
 
-export const CreatePlaylistDialog: FC = () => {
-  const [open, setOpen] = useState(false);
-  const [playlistId, setPlaylistId] = useState("");
-  const [name, setName] = useState("");
-  const [interval, setInterval] = useState("1m");
+export const CreatePlaylistDialog = () => {
+  const display = useContext(DisplayContext);
+  const [isOpen, setIsOpen] = createSignal(false);
+  const [isSubmitting, setIsSubmitting] = createSignal(false);
+  const [failure, setFailure] = createSignal<string | null>(null);
+  let form: HTMLFormElement | undefined;
 
-  const create = useCreatePlaylist({ onSuccess: () => setOpen(false) });
+  const close = () => {
+    setIsOpen(false);
+    setFailure(null);
+    form?.reset();
+  };
+
+  const submit = async (event: SubmitEvent & { currentTarget: HTMLFormElement; }) => {
+    event.preventDefault();
+
+    const fields = new FormData(event.currentTarget);
+    const name = readText(fields, "name");
+
+    setIsSubmitting(true);
+
+    const result = await display.apply(async () => createPlaylist({
+      playlist_id: readText(fields, "playlist_id"),
+      interval: readText(fields, "interval"),
+      ...(name !== "" && { name }),
+    }), ["playlists"]);
+
+    setIsSubmitting(false);
+
+    if (result.ok) close();
+    else setFailure(result.message);
+  };
 
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger className="bg-gray-800 px-3 py-1 text-sm text-gray-100 hover:bg-gray-700">
+    <>
+      <button type="button" onClick={() => setIsOpen(true)} class={[PRIMARY_BUTTON, "flex items-center gap-1.5"]}>
+        <FiPlus size={14} aria-hidden="true" />
         New playlist
-      </Dialog.Trigger>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/60" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 w-[28rem] -translate-x-1/2 -translate-y-1/2 border border-gray-800 bg-gray-950 p-5">
-          <Dialog.Title className="mb-4 font-semibold text-gray-100">New playlist</Dialog.Title>
-
-          <fieldset className="flex flex-col gap-3">
-            <label className="text-sm text-gray-400">
-              Playlist id
-              <input
-                value={playlistId}
-                onChange={event => setPlaylistId(event.target.value)}
-                placeholder="lobby"
-                className="mt-1 w-full border border-gray-800 bg-gray-900 px-2 py-1 text-gray-100"
-              />
-            </label>
-            <label className="text-sm text-gray-400">
-              Name
-              <input
-                value={name}
-                onChange={event => setName(event.target.value)}
-                placeholder="Lobby"
-                className="mt-1 w-full border border-gray-800 bg-gray-900 px-2 py-1 text-gray-100"
-              />
-            </label>
-            <label className="text-sm text-gray-400">
-              Interval
-              <input
-                value={interval}
-                onChange={event => setInterval(event.target.value)}
-                placeholder="1m"
-                className="mt-1 w-full border border-gray-800 bg-gray-900 px-2 py-1 text-gray-100"
-              />
-              <span className="mt-1 block text-xs text-gray-600">
-                A duration such as 30s, 5m or 1h.
-              </span>
-            </label>
-          </fieldset>
-
-          <div className="mt-5 flex justify-end gap-2">
-            <Dialog.Close className="px-3 py-1 text-sm text-gray-400">Cancel</Dialog.Close>
-            <button
-              type="button"
-              onClick={() => create.mutate({
-                playlist_id: playlistId,
-                name: name || undefined,
-                interval,
-              })}
-              disabled={!playlistId || !interval}
-              className="bg-emerald-700 px-3 py-1 text-sm text-white disabled:opacity-50"
-            >
-              Create
+      </button>
+      <Modal title="New playlist" isOpen={isOpen()} onClose={close}>
+        <form
+          ref={(element) => {
+            form = element;
+          }}
+          class="space-y-4"
+          onSubmit={event => void submit(event)}
+        >
+          <div class="space-y-1">
+            <label for="playlist-id" class={FIELD_LABEL}>Playlist id</label>
+            <input
+              id="playlist-id"
+              name="playlist_id"
+              type="text"
+              required
+              autofocus
+              placeholder="lobby"
+              class={FIELD}
+            />
+          </div>
+          <div class="space-y-1">
+            <label for="playlist-name" class={FIELD_LABEL}>Name (optional)</label>
+            <input
+              id="playlist-name"
+              name="name"
+              type="text"
+              placeholder="Lobby"
+              class={FIELD}
+            />
+          </div>
+          <div class="space-y-1">
+            <label for="playlist-interval" class={FIELD_LABEL}>Interval</label>
+            <input
+              id="playlist-interval"
+              name="interval"
+              type="text"
+              required
+              value="1m"
+              aria-describedby="playlist-interval-hint"
+              class={FIELD}
+            />
+            <p id="playlist-interval-hint" class="text-xs text-slate-500 dark:text-slate-500">A duration such as 30s, 5m or 1h.</p>
+          </div>
+          <Show when={failure()}>
+            {message => <p class="text-sm text-red-600 dark:text-red-400" role="alert">{message()}</p>}
+          </Show>
+          <div class="flex justify-end gap-2">
+            <button type="button" onClick={close} class={SECONDARY_BUTTON}>Cancel</button>
+            <button type="submit" disabled={isSubmitting()} class={PRIMARY_BUTTON}>
+              {isSubmitting() ? "Creating..." : "Create"}
             </button>
           </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+        </form>
+      </Modal>
+    </>
   );
 };

@@ -1,109 +1,101 @@
-import { closestCenter, DndContext, type DragEndEvent } from "@dnd-kit/core";
-import { horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
-import { type FC } from "react";
-import { FiTrash2 } from "react-icons/fi";
+import { FiPlay, FiTrash2 } from "solid-icons/fi";
+import { createSignal, For, Show, useContext } from "solid-js";
 
-import { usePlaylistTabs } from "../api/playlists";
-import type { components } from "../api/schema.gen";
-import { useActivatePlaylist } from "../hooks/useActivatePlaylist";
-import { useDeletePlaylist } from "../hooks/useDeletePlaylist";
-import { useReorderTabs } from "../hooks/useReorderTabs";
-import { useStatus } from "../hooks/useStatus";
+import type { PlaylistInfo } from "../api/playlists";
+import { activatePlaylist, deletePlaylist, reorderTabs } from "../api/playlists";
+import { DisplayContext } from "../app/display";
 import { AddTabDialog } from "./AddTabDialog";
+import { DANGER_ICON_BUTTON, SECONDARY_BUTTON } from "./controls";
 import { TabCard } from "./TabCard";
 
-type PlaylistInfo = components["schemas"]["PlaylistInfo"];
+export const PlaylistCard = (properties: { playlist: PlaylistInfo; }) => {
+  const display = useContext(DisplayContext);
+  const [draggedTabId, setDraggedTabId] = createSignal<string | null>(null);
 
-export const PlaylistCard: FC<{ playlist: PlaylistInfo; }> = ({ playlist }) => {
-  const { data: status } = useStatus();
-  const { data: tabs = [], isLoading } = usePlaylistTabs(playlist.playlist_id);
+  const tabs = () => display.playlistTabs().get(properties.playlist.playlist_id) ?? [];
+  const isActive = () => display.status().current_playlist_id === properties.playlist.playlist_id;
 
-  const reorder = useReorderTabs();
-  const activate = useActivatePlaylist();
-  const remove = useDeletePlaylist();
+  const move = (tabId: string, toIndex: number) => {
+    const tabIds = tabs().map(tab => tab.tab_id);
+    const fromIndex = tabIds.indexOf(tabId);
 
-  const isActive = status?.current_playlist_id === playlist.playlist_id;
-
-  const onDragEnd = ({ active, over }: DragEndEvent) => {
-    // dnd-kit identifies a sortable by `id`. The name belongs to its API, not to this codebase.
-    /* eslint-disable no-restricted-syntax */
-    if (!over || active.id === over.id) {
+    if (fromIndex === -1 || fromIndex === toIndex || toIndex < 0 || toIndex >= tabIds.length) {
       return;
     }
 
-    const from = tabs.findIndex(tab => tab.tab_id === active.id);
-    const to = tabs.findIndex(tab => tab.tab_id === over.id);
-    /* eslint-enable no-restricted-syntax */
+    tabIds.splice(fromIndex, 1);
+    tabIds.splice(toIndex, 0, tabId);
 
-    if (from === -1 || to === -1) {
-      return;
-    }
-
-    const tabIds = tabs.map(tab => tab.tab_id);
-    const [moved] = tabIds.splice(from, 1);
-
-    tabIds.splice(to, 0, moved);
-
-    reorder.mutate({ playlistId: playlist.playlist_id, tabIds });
+    void display.change(async () => reorderTabs(properties.playlist.playlist_id, tabIds), ["playlistTabs"]);
   };
 
   return (
-    <section className="border border-gray-800">
-      <header className="flex items-center gap-3 border-b border-gray-800 px-4 py-3">
-        <h2 className="font-semibold text-gray-100">{playlist.name}</h2>
-        {isActive && (
-          <span className="bg-emerald-600 px-1.5 py-0.5 text-xs text-white">active</span>
-        )}
-        {playlist.is_default && (
-          <span className="bg-gray-700 px-1.5 py-0.5 text-xs text-gray-200">default</span>
-        )}
-        <span className="text-xs text-gray-500">
-          {`every ${playlist.interval}, ${playlist.tab_count} tabs`}
-        </span>
-        <span className="flex-1" />
-        <AddTabDialog playlistId={playlist.playlist_id} />
-        {!isActive && (
+    <section class="rounded-panel bg-surface" aria-label={properties.playlist.name}>
+      <header class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
+        <div class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5">
+          <h3 class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{properties.playlist.name}</h3>
+          <Show when={isActive()}>
+            <span class="flex items-center gap-1.5 self-center text-xs font-medium text-emerald-700 dark:text-emerald-400">
+              <span class="size-2 rounded-full bg-emerald-500" aria-hidden="true" />
+              Playing
+            </span>
+          </Show>
+          <Show when={properties.playlist.is_default}>
+            <span class="text-xs text-slate-500 dark:text-slate-500">Default</span>
+          </Show>
+          <span class="text-xs text-slate-500 tabular-nums dark:text-slate-500">
+            {`Every ${properties.playlist.interval}, ${properties.playlist.tab_count} ${properties.playlist.tab_count === 1 ? "tab" : "tabs"}`}
+          </span>
+        </div>
+        <div class="flex shrink-0 items-center gap-2">
+          <AddTabDialog playlistId={properties.playlist.playlist_id} playlistName={properties.playlist.name} />
+          <Show when={!isActive()}>
+            <button
+              type="button"
+              onClick={() => void display.change(async () => activatePlaylist(properties.playlist.playlist_id), ["status", "playlists"])}
+              class={SECONDARY_BUTTON}
+            >
+              <FiPlay size={14} aria-hidden="true" />
+              Play
+            </button>
+          </Show>
           <button
             type="button"
-            onClick={() => activate.mutate(playlist.playlist_id)}
-            className="bg-gray-800 px-2 py-1 text-sm text-gray-100 hover:bg-gray-700"
+            onClick={() => void display.change(async () => deletePlaylist(properties.playlist.playlist_id), ["playlists", "status"])}
+            aria-label={`Delete ${properties.playlist.name}`}
+            title="Delete playlist"
+            class={DANGER_ICON_BUTTON}
           >
-            Play
+            <FiTrash2 size={14} aria-hidden="true" />
           </button>
-        )}
-        <button
-          type="button"
-          onClick={() => remove.mutate(playlist.playlist_id)}
-          className="text-gray-500 hover:text-red-400"
-          title="Delete playlist"
-        >
-          <FiTrash2 />
-        </button>
+        </div>
       </header>
 
-      <div className="overflow-x-auto p-4">
-        {isLoading && <p className="text-sm text-gray-500">Loading tabs...</p>}
-        {!isLoading && tabs.length === 0 && (
-          <p className="text-sm text-gray-500">No tabs yet.</p>
-        )}
-        <DndContext collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-          <SortableContext
-            items={tabs.map(tab => tab.tab_id)}
-            strategy={horizontalListSortingStrategy}
-          >
-            <div className="flex gap-3">
-              {tabs.map(tab => (
-                <TabCard
-                  key={tab.tab_id}
-                  tab={tab}
-                  playlistId={playlist.playlist_id}
-                  isOnScreen={isActive && status?.current_tab_id === tab.tab_id}
-                />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
-      </div>
+      <Show
+        when={tabs().length > 0}
+        fallback={<p class="px-4 pb-4 text-sm text-slate-500 dark:text-slate-500">No tabs yet.</p>}
+      >
+        <ol class="flex gap-4 overflow-x-auto px-4 pt-1 pb-4" aria-label={`Tabs of ${properties.playlist.name}, in play order`}>
+          <For each={tabs()} keyed={tab => tab.tab_id}>
+            {(tab, index) => (
+              <TabCard
+                tab={tab()}
+                playlistId={properties.playlist.playlist_id}
+                isOnScreen={isActive() && display.status().current_tab_id === tab().tab_id}
+                isDragged={draggedTabId() === tab().tab_id}
+                onDragStart={() => setDraggedTabId(tab().tab_id)}
+                onDragEnd={() => setDraggedTabId(null)}
+                onDrop={() => {
+                  const dragged = draggedTabId();
+
+                  if (dragged !== null) move(dragged, index());
+                }}
+                onMove={offset => move(tab().tab_id, index() + offset)}
+              />
+            )}
+          </For>
+        </ol>
+      </Show>
     </section>
   );
 };

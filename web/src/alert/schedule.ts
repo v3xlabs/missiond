@@ -1,4 +1,4 @@
-import type { Alert } from "./useAlerts";
+import type { Alert } from "./feed";
 
 /** An alert that names a time, which is what the axis can place. */
 export type Timed = {
@@ -23,7 +23,7 @@ const SOON_MS = HOUR_MS;
 /** Short enough to read, long enough that one short meeting does not fill the rail on its own. */
 const SHORTEST_SPAN_MS = 2 * HOUR_MS;
 
-export const timedOf = (alerts: Alert[]): Timed[] =>
+export const timedOf = (alerts: readonly Alert[]): Timed[] =>
   alerts
     .flatMap((alert) => {
       if (!alert.starts_at) {
@@ -45,7 +45,7 @@ export const timedOf = (alerts: Alert[]): Timed[] =>
  * Lanes are counted per run of meetings that overlap, so two at one time each take half the width
  * and a meeting standing on its own keeps all of it.
  */
-export const placed = (entries: Timed[]): Placed[] => {
+export const placed = (entries: readonly Timed[]): Placed[] => {
   const out: Placed[] = [];
   let run: Timed[] = [];
   let runEnds = 0;
@@ -87,7 +87,7 @@ export const placed = (entries: Timed[]): Placed[] => {
   return out;
 };
 
-export const spanOf = (entries: Timed[], now: number) =>
+export const spanOf = (entries: readonly Timed[], now: number) =>
   Math.max(SHORTEST_SPAN_MS, ...entries.map(entry => entry.endsAt - now));
 
 export const percentOf = (at: number, from: number, spanMs: number) =>

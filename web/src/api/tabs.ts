@@ -1,17 +1,31 @@
-import { useQuery } from "@tanstack/react-query";
-
 import { apiRequest } from "./api";
-import { failure } from "./request";
+import { failure, outcome } from "./request";
+import type { components } from "./schema.gen";
 
-export const useTabs = () => useQuery({
-  queryKey: ["tabs"],
-  queryFn: async () => {
-    const response = await apiRequest("/tabs", "get", {});
+export type TabInfo = components["schemas"]["TabInfo"];
 
-    if (response.status !== 200) {
-      throw failure(response);
-    }
+export const listTabs = async (): Promise<readonly TabInfo[]> => {
+  const response = await apiRequest("/tabs", "get", {});
 
-    return response.data;
-  },
-});
+  if (response.status !== 200) {
+    throw failure(response);
+  }
+
+  return response.data;
+};
+
+export const upsertTab = async (tabId: string, tab: components["schemas"]["UpsertTabRequest"]) =>
+  outcome(await apiRequest("/tabs/{tab_id}", "put", {
+    path: { tab_id: tabId },
+    contentType: "application/json; charset=utf-8",
+    data: tab,
+  }));
+
+export const deleteTab = async (tabId: string) =>
+  outcome(await apiRequest("/tabs/{tab_id}", "delete", { path: { tab_id: tabId } }));
+
+export const refreshTab = async (tabId: string) =>
+  outcome(await apiRequest("/tabs/{tab_id}/refresh", "post", { path: { tab_id: tabId } }));
+
+export const recreateTab = async (tabId: string) =>
+  outcome(await apiRequest("/tabs/{tab_id}/recreate", "post", { path: { tab_id: tabId } }));
