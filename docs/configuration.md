@@ -56,6 +56,9 @@ port = 3000
 [admin_key]
 file = "/run/secrets/missiond_admin_key"
 
+[control_key]
+file = "/run/secrets/missiond_control_key"
+
 [chromium]
 enabled = true
 fullscreen = true
@@ -78,6 +81,8 @@ password = { env = "MISSIOND_MQTT_PASSWORD" }
 | `device_id` | string | Stable identity. MQTT discovery topics are built from it. |
 | `http.host`, `http.port` | string, integer | Where the API and web UI listen. Defaults are `0.0.0.0` and `3000`. |
 | `admin_key` | secret, optional | Required on every mutating request as `authorization: Bearer <key>`. Without one, anything that can reach the port can change the display. |
+| `control_key` | secret, optional | A second bearer key for a button panel. It drives what is on screen and cannot edit configuration. See [The API](#the-api). Only checked when `admin_key` is set. |
+| `mdns` | boolean | Defaults to `true`. Advertises the API as `_missiond._tcp` with `device_id`, `name` and `version` in the TXT record. Nothing is advertised while `http.host` is a loopback address. |
 | `chromium.enabled` | boolean | A disabled browser leaves the API and web UI running, which is how the daemon is tested without a compositor. |
 | `chromium.fullscreen` | boolean | Defaults to `true`. See below. |
 | `chromium.binary_path` | string, optional | Falls back to `$CHROMIUM_BINARY`, then to `chromium` on `PATH`. |
@@ -297,28 +302,36 @@ given the environment variable rather than merely redacted.
 
 ## The API
 
-`GET` is open. Every other method requires the admin key when one is configured.
+`GET` is open. Every other method requires a key when an admin key is configured. The admin key
+opens every route. The control key opens the routes marked *control*: they change what is on
+screen, and none of them edits configuration or powers the machine off.
 
-| Method | Path | Does |
-| --- | --- | --- |
-| GET | `/api/status` | What is on screen, plus `config_read_only`. |
-| GET | `/api/events` | Server sent events. One message per change. |
-| GET | `/api/playlists` | Every playlist. |
-| GET | `/api/playlists/:playlist_id/tabs` | A playlist's tabs, in play order. |
-| GET | `/api/tabs` | Every configured tab. |
-| GET | `/api/preview/:tab_id` | One JPEG frame. |
-| GET | `/api/preview_live/:tab_id` | An MJPEG stream. |
-| GET | `/api/config/export` | Every document as TOML. |
-| POST | `/api/playlists/:playlist_id/activate` | Put a playlist on screen. |
-| POST | `/api/playlists/:playlist_id/tabs/:tab_id/activate` | Put a tab on screen, and hold it. |
-| POST | `/api/playback/{next,previous,pause,resume}` | Drive the rotation. |
-| PUT | `/api/playlists/:playlist_id/reorder` | Reorder, with the full tab list. |
-| PUT | `/api/playlists/:playlist_id/tabs/:tab_id/enabled` | Include or exclude a tab. |
-| PUT | `/api/tabs/:tab_id` | Create a tab, or replace one with that id. |
-| DELETE | `/api/tabs/:tab_id` | Remove a tab and every reference to it. |
-| POST | `/api/display/power/:on` | Turn the screen on or off. |
-| PUT | `/api/display/brightness` | Set panel brightness over DDC. |
-| POST | `/api/system/{poweroff,reboot,suspend}` | Power actions over logind. |
+| Method | Path | Key | Does |
+| --- | --- | --- | --- |
+| GET | `/api/status` | | What is on screen, plus `config_read_only` and the `access` the request's key has. |
+| GET | `/api/events` | | Server sent events. See [The event stream](#the-event-stream). |
+| GET | `/api/playlists` | | Every playlist. |
+| GET | `/api/playlists/:playlist_id/tabs` | | A playlist's tabs, in play order. |
+| GET | `/api/tabs` | | Every configured tab. |
+| GET | `/api/preview/:tab_id` | | One JPEG frame. |
+| GET | `/api/preview_live/:tab_id` | | An MJPEG stream. |
+| GET | `/api/config/export` | | Every document as TOML. |
+| POST | `/api/playlists/:playlist_id/activate` | control | Put a playlist on screen. |
+| POST | `/api/playlists/:playlist_id/tabs/:tab_id/activate` | control | Put a tab on screen, and hold it. |
+| POST | `/api/tabs/:tab_id/activate` | control | Put a tab on screen, and hold it, within the current playlist when that has the tab and otherwise within the first playlist that does. |
+| POST | `/api/playback/{next,previous,pause,resume}` | control | Drive the rotation. |
+| POST | `/api/playback/toggle` | control | Pause or resume. Answers `{"auto_rotate": ...}`. |
+| POST | `/api/tabs/:tab_id/{refresh,recreate}` | control | Reload a tab's page, or close and reopen it. |
+| PUT | `/api/playlists/:playlist_id/reorder` | admin | Reorder, with the full tab list. |
+| PUT | `/api/playlists/:playlist_id/tabs/:tab_id/enabled` | admin | Include or exclude a tab. |
+| PUT | `/api/tabs/:tab_id` | admin | Create a tab, or replace one with that id. |
+| DELETE | `/api/tabs/:tab_id` | admin | Remove a tab and every reference to it. |
+| POST | `/api/display/power/:on` | control | Turn the screen on or off. |
+| POST | `/api/display/power/toggle` | control | Turn the screen off or on. Answers `{"screen_on": ...}`. |
+| PUT | `/api/display/brightness` | control | Set panel brightness over DDC. |
+| POST | `/api/notify`, DELETE `/api/notifications/:id` | control | Raise or dismiss an alert. |
+| POST | `/api/sidebar/toggle`, `/api/calendar/toggle` | control | Toggle the rail or the full-screen agenda. |
+| POST | `/api/system/{poweroff,reboot,suspend}` | admin | Power actions over logind. |
 
 Subscribing to a preview starts the capture, and dropping the subscription stops it, so a display
 nobody is watching does not encode JPEG in the background. The tab on screen keeps a slow capture
@@ -328,6 +341,47 @@ Failures answer with a status code and `{"message": "..."}`. Nothing returns HTT
 error.
 
 Swagger UI is at `/docs`, and the OpenAPI document at `/docs/spec`.
+
+### The event stream
+
+`GET /api/events` sends two kinds of named frame. Each is sent once on connect, and again
+whenever it changes, so a client that holds the stream open never needs to poll.
+
+`event: state` is what is on screen:
+
+```json
+{
+  "device_id": "lobby-display",
+  "device_name": "Lobby Display",
+  "current_playlist_id": "lobby",
+  "current_tab_id": "overview",
+  "auto_rotate": true,
+  "next_rotation_at": 1790286710,
+  "screen_on": true,
+  "brightness": 80,
+  "requires_auth": true,
+  "access": "control"
+}
+```
+
+`next_rotation_at` is when rotation next steps, as Unix seconds, and accounts for a hold. It is
+`null` while rotation is paused. `access` is what the key the stream was opened with allows:
+`admin`, `control` or `none`. A browser `EventSource` sends no header, so it always reads `none`
+when a key is configured.
+
+`event: catalogue` is every playlist and its tabs, in play order, and follows every edit:
+
+```json
+{
+  "playlists": [
+    {
+      "playlist_id": "lobby",
+      "name": "Lobby",
+      "tabs": [{ "tab_id": "overview", "name": "Overview", "enabled": true }]
+    }
+  ]
+}
+```
 
 ## Previews
 

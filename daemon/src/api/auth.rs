@@ -1,4 +1,5 @@
-use poem_openapi::param::Header;
+use poem_openapi::{param::Header, Enum};
+use serde::Serialize;
 
 use crate::state::AppState;
 
@@ -6,25 +7,57 @@ use super::{ApiError, ApiResult};
 
 pub type Authorization = Header<Option<String>>;
 
-pub fn is_authorized(state: &AppState, presented: &Authorization) -> bool {
-    let Some(expected) = state.admin_key.as_deref() else {
-        return true;
-    };
-
-    let presented = presented
-        .0
-        .as_deref()
-        .and_then(|value| value.strip_prefix("Bearer "))
-        .unwrap_or_default();
-
-    constant_time_eq(presented.as_bytes(), expected.as_bytes())
+/// What the key a request carried lets it do.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Enum)]
+#[serde(rename_all = "lowercase")]
+#[oai(rename_all = "lowercase")]
+pub enum Access {
+    /// Everything, including configuration. Also what every request gets when no admin key is
+    /// configured.
+    Admin,
+    /// What is on screen, and nothing that edits configuration.
+    Control,
+    None,
 }
 
+impl Access {
+    pub fn of(state: &AppState, presented: Option<&str>) -> Self {
+        let Some(admin) = state.admin_key.as_deref() else {
+            return Self::Admin;
+        };
+
+        let presented = presented
+            .and_then(|value| value.strip_prefix("Bearer "))
+            .unwrap_or_default()
+            .as_bytes();
+
+        if constant_time_eq(presented, admin.as_bytes()) {
+            Self::Admin
+        } else if state
+            .control_key
+            .as_deref()
+            .is_some_and(|control| constant_time_eq(presented, control.as_bytes()))
+        {
+            Self::Control
+        } else {
+            Self::None
+        }
+    }
+}
+
+/// Only the admin key passes. Everything that edits configuration asks for this.
 pub fn authorize(state: &AppState, presented: &Authorization) -> ApiResult<()> {
-    if is_authorized(state, presented) {
-        Ok(())
-    } else {
-        Err(ApiError::unauthorized())
+    match Access::of(state, presented.0.as_deref()) {
+        Access::Admin => Ok(()),
+        Access::Control | Access::None => Err(ApiError::unauthorized("admin key")),
+    }
+}
+
+/// The admin key or the control key passes. Changes what is on screen, never configuration.
+pub fn authorize_control(state: &AppState, presented: &Authorization) -> ApiResult<()> {
+    match Access::of(state, presented.0.as_deref()) {
+        Access::Admin | Access::Control => Ok(()),
+        Access::None => Err(ApiError::unauthorized("admin or control key")),
     }
 }
 

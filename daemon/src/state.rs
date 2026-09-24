@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use crate::{
     chrome::ChromeController,
-    config::{ConfigStore, Dirs},
+    config::{ConfigStore, Dirs, SecretRef},
     db::Runtime,
     display::{capture::OutputCapture, Display},
     events::Events,
@@ -28,6 +28,7 @@ pub struct AppState {
     pub hass: Arc<HassManager>,
     pub runtime: Runtime,
     pub admin_key: Option<String>,
+    pub control_key: Option<String>,
     pub started_at: std::time::Instant,
 }
 
@@ -39,10 +40,16 @@ impl AppState {
         let config = Arc::new(ConfigStore::load(dirs)?);
         let device = config.read().await.device;
 
-        let admin_key = match device.admin_key.as_ref() {
-            Some(reference) => Some(reference.resolve()?),
-            None => None,
-        };
+        let admin_key = device
+            .admin_key
+            .as_ref()
+            .map(SecretRef::resolve)
+            .transpose()?;
+        let control_key = device
+            .control_key
+            .as_ref()
+            .map(SecretRef::resolve)
+            .transpose()?;
 
         let hass = HassManager::new(&device).await?;
         let dirs_state = config.dirs.state.clone();
@@ -61,6 +68,7 @@ impl AppState {
             hass: Arc::new(hass),
             runtime,
             admin_key,
+            control_key,
             started_at: std::time::Instant::now(),
         });
 

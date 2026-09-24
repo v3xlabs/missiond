@@ -20,6 +20,7 @@ pub mod display;
 pub mod events;
 pub mod hass;
 pub mod http;
+pub mod mdns;
 pub mod niri;
 pub mod notifications;
 pub mod player;
@@ -76,9 +77,21 @@ async fn main() -> Result<()> {
     tokio::spawn(notifications::surfaces::run(state.clone()));
     tokio::spawn(calendar::run(state.clone()));
 
+    let advertisement = match mdns::Advertisement::start(&state.config.device().await) {
+        Ok(advertisement) => advertisement,
+        Err(error) => {
+            warn!("failed to advertise over mdns: {error}");
+            None
+        }
+    };
+
     tokio::select! {
         _ = http => {}
         signal = shutdown_signal() => info!(%signal, "shutting down"),
+    }
+
+    if let Some(advertisement) = advertisement {
+        advertisement.stop().await;
     }
 
     // Without this the browser survives the daemon and the next start finds a second one.

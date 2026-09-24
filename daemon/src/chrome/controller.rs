@@ -324,6 +324,10 @@ impl ChromeController {
                 },
             };
 
+            // A message can change the rotation or a hold without changing the tab, and the
+            // stream carries both.
+            app_state.events.publish(&app_state).await;
+
             let _ = reply.send(response);
         }
 
@@ -361,13 +365,14 @@ impl ChromeController {
                 Ok(ChromeResponse::Success)
             }
             ChromeMessage::Resume => {
-                let playlist_id = self.state.lock().await.current_playlist_id.clone();
-
-                if let Some(playlist_id) = playlist_id {
-                    if let Some(playlist) = app_state.config.playlist(&playlist_id).await {
-                        self.state.lock().await.hold_until = None;
-                        self.start_auto_rotation(playlist.interval.into()).await;
-                    }
+                self.resume(app_state).await;
+                Ok(ChromeResponse::Success)
+            }
+            ChromeMessage::ToggleRotation => {
+                if self.state.lock().await.auto_rotate() {
+                    self.stop_auto_rotation().await;
+                } else {
+                    self.resume(app_state).await;
                 }
 
                 Ok(ChromeResponse::Success)
@@ -391,7 +396,7 @@ impl ChromeController {
                     current_playlist_id: state.current_playlist_id.clone(),
                     current_tab_id: state.current_tab_id.clone(),
                     is_running: state.is_running,
-                    auto_rotate: state.auto_rotate,
+                    auto_rotate: state.auto_rotate(),
                 })
             }
             ChromeMessage::Takeover {
@@ -427,6 +432,19 @@ impl ChromeController {
 
         self.activate_playlist(&playlist.playlist_id.clone(), app_state)
             .await
+    }
+
+    async fn resume(&self, app_state: &Arc<AppState>) {
+        let playlist_id = self.state.lock().await.current_playlist_id.clone();
+
+        let Some(playlist_id) = playlist_id else {
+            return;
+        };
+
+        if let Some(playlist) = app_state.config.playlist(&playlist_id).await {
+            self.state.lock().await.hold_until = None;
+            self.start_auto_rotation(playlist.interval.into()).await;
+        }
     }
 
     async fn activate_playlist(&self, playlist_id: &str, app_state: &Arc<AppState>) -> Result<()> {
@@ -947,7 +965,7 @@ impl ChromeController {
         }
 
         self.stop_auto_rotation().await;
-        self.state.lock().await.auto_rotate = true;
+        self.state.lock().await.rotation = Some(interval);
 
         let sender = self.sender.clone();
         let state = self.state.clone();
@@ -959,7 +977,7 @@ impl ChromeController {
                 {
                     let mut state = state.lock().await;
 
-                    if !state.auto_rotate {
+                    if state.rotation.is_none() {
                         break;
                     }
 
@@ -989,7 +1007,7 @@ impl ChromeController {
     }
 
     async fn stop_auto_rotation(&self) {
-        self.state.lock().await.auto_rotate = false;
+        self.state.lock().await.rotation = None;
 
         if let Some(handle) = self.auto_task.lock().await.take() {
             handle.abort();

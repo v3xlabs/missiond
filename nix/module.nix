@@ -82,10 +82,14 @@
           inherit (cfg) host port;
         };
         chromium = cfg.settings.chromium;
+        mdns = cfg.settings.mdns;
         mpv = cfg.settings.mpv;
       }
       // lib.optionalAttrs (cfg.adminKeyFile != null) {
         admin_key.file = cfg.adminKeyFile;
+      }
+      // lib.optionalAttrs (cfg.controlKeyFile != null) {
+        control_key.file = cfg.controlKeyFile;
       }
       // lib.optionalAttrs (cfg.settings.homeassistant != null) {
         homeassistant = cfg.settings.homeassistant;
@@ -161,6 +165,17 @@ in {
       '';
     };
 
+    controlKeyFile = lib.mkOption {
+      type = types.nullOr types.path;
+      default = null;
+      example = "/run/secrets/missiond_control_key";
+      description = ''
+        File holding a second bearer key that changes what is on screen and nothing else: playback,
+        screen power and brightness, alerts, the rail and the agenda. It cannot edit configuration
+        or power the machine off. Meant for a button panel. Only checked when adminKeyFile is set.
+      '';
+    };
+
     extraPackages = lib.mkOption {
       type = types.listOf types.package;
       default = [];
@@ -195,7 +210,16 @@ in {
           device_id = lib.mkOption {
             type = types.str;
             default = "missiond";
-            description = "Stable identity, used for MQTT discovery topics.";
+            description = "Stable identity, used for MQTT discovery topics and the mDNS host name.";
+          };
+
+          mdns = lib.mkOption {
+            type = types.bool;
+            default = true;
+            description = ''
+              Advertise the API as `_missiond._tcp` on the local network. Nothing is advertised
+              while `host` is a loopback address.
+            '';
           };
 
           chromium = lib.mkOption {
@@ -367,6 +391,7 @@ in {
     ];
 
     networking.firewall.allowedTCPPorts = lib.mkIf cfg.openFirewall [cfg.port];
+    networking.firewall.allowedUDPPorts = lib.mkIf (cfg.openFirewall && (cfg.settings == null || cfg.settings.mdns)) [5353];
 
     systemd.user.services.missiond = {
       description = "Mission Control display daemon";

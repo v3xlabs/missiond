@@ -1023,6 +1023,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tabs/{tab_id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Put a tab on screen without naming a playlist, and hold it there. The tab plays within the
+         *     current playlist when that has it, otherwise within the first playlist that does. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    authorization?: string;
+                };
+                path: {
+                    tab_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tabs/{tab_id}/refresh": {
         parameters: {
             query?: never;
@@ -1441,6 +1513,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/playback/toggle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pause if rotating, resume if paused. The answer says which way it went. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    authorization?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["RotationState"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/display/power/{on}": {
         parameters: {
             query?: never;
@@ -1470,6 +1611,75 @@ export interface paths {
                     };
                     content: {
                         "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/display/power/toggle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn the screen off if it is on, on if it is off. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    authorization?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["PowerState"];
                     };
                 };
                 400: {
@@ -2213,6 +2423,11 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * @description What the key a request carried lets it do.
+         * @enum {string}
+         */
+        Access: "admin" | "control" | "none";
+        /**
          * CalendarState
          * @description Whether the full-screen agenda is what the display is showing.
          */
@@ -2246,9 +2461,9 @@ export interface components {
             config_read_only: boolean;
             /** @description Whether an admin key is configured at all. False means every mutation is open. */
             requires_auth: boolean;
-            /** @description Whether the key this request carried was accepted. Lets the web UI show that a mutation
-             *     will be refused before the reader clicks it. */
-            authenticated: boolean;
+            /** @description What the key this request carried allows. Lets the web UI show that a mutation will be
+             *     refused before the reader clicks it. */
+            access: components["schemas"]["Access"] & unknown;
         };
         /** ErrorBody */
         ErrorBody: {
@@ -2345,11 +2560,25 @@ export interface components {
             is_active: boolean;
             is_default: boolean;
         };
+        /**
+         * PowerState
+         * @description Where the screen ended up, so a caller that toggled it does not have to ask again.
+         */
+        PowerState: {
+            screen_on: boolean;
+        };
         /** ReorderRequest */
         ReorderRequest: {
             /** @description The playlist's tabs, in the order they should play. It must hold exactly the tabs the
              *     playlist already has, so a stale browser cannot silently drop one. */
             tab_ids: string[];
+        };
+        /**
+         * RotationState
+         * @description Whether rotation ended up running, so a caller that toggled it does not have to ask again.
+         */
+        RotationState: {
+            auto_rotate: boolean;
         };
         /** SetBrightnessRequest */
         SetBrightnessRequest: {

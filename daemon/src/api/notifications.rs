@@ -12,7 +12,7 @@ use crate::{
 };
 
 use super::{
-    auth::{authorize, Authorization},
+    auth::{authorize_control, Authorization},
     ApiError, ApiResult, CalendarState, MutationResult, NotifyRequest, SidebarState, StingerInfo,
 };
 
@@ -29,7 +29,7 @@ impl NotificationApi {
         request: Json<NotifyRequest>,
         authorization: Authorization,
     ) -> ApiResult<Json<MutationResult>> {
-        authorize(&self.state, &authorization)?;
+        authorize_control(&self.state, &authorization)?;
 
         let defaults = self.state.config.read().await.notifications;
         let (notification, duration) = request.0.into_notification(&defaults)?;
@@ -106,7 +106,7 @@ impl NotificationApi {
         notification_id: Path<u64>,
         authorization: Authorization,
     ) -> ApiResult<Json<MutationResult>> {
-        authorize(&self.state, &authorization)?;
+        authorize_control(&self.state, &authorization)?;
 
         if !self.state.notifications.dismiss(notification_id.0).await {
             return Err(ApiError::not_found(notification_id.0));
@@ -129,7 +129,7 @@ impl NotificationApi {
     /// until something new arrives for it.
     #[oai(path = "/sidebar/toggle", method = "post")]
     async fn toggle_sidebar(&self, authorization: Authorization) -> ApiResult<Json<SidebarState>> {
-        authorize(&self.state, &authorization)?;
+        authorize_control(&self.state, &authorization)?;
 
         let open = self.state.surfaces.toggle_sidebar(&self.state).await;
 
@@ -151,7 +151,7 @@ impl NotificationApi {
         &self,
         authorization: Authorization,
     ) -> ApiResult<Json<CalendarState>> {
-        authorize(&self.state, &authorization)?;
+        authorize_control(&self.state, &authorization)?;
 
         let showing = self
             .state

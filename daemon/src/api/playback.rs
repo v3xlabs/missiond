@@ -8,8 +8,8 @@ use crate::{
 };
 
 use super::{
-    auth::{authorize, Authorization},
-    ApiError, ApiResult, MutationResult,
+    auth::{authorize_control, Authorization},
+    ApiError, ApiResult, MutationResult, RotationState,
 };
 
 pub struct PlaybackApi {
@@ -41,6 +41,17 @@ impl PlaybackApi {
     async fn resume(&self, authorization: Authorization) -> ApiResult<Json<MutationResult>> {
         self.send(ChromeMessage::Resume, &authorization).await
     }
+
+    /// Pause if rotating, resume if paused. The answer says which way it went.
+    #[oai(path = "/playback/toggle", method = "post")]
+    async fn toggle(&self, authorization: Authorization) -> ApiResult<Json<RotationState>> {
+        self.send(ChromeMessage::ToggleRotation, &authorization)
+            .await?;
+
+        Ok(Json(RotationState {
+            auto_rotate: self.state.chrome.state.lock().await.auto_rotate(),
+        }))
+    }
 }
 
 impl PlaybackApi {
@@ -49,7 +60,7 @@ impl PlaybackApi {
         message: ChromeMessage,
         authorization: &Authorization,
     ) -> ApiResult<Json<MutationResult>> {
-        authorize(&self.state, authorization)?;
+        authorize_control(&self.state, authorization)?;
         tell(&self.state.chrome, message)
             .await
             .map_err(ApiError::internal)?;

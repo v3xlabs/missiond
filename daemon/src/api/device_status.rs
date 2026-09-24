@@ -1,7 +1,9 @@
 use poem_openapi::Object;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Object)]
+use super::auth::Access;
+
+#[derive(Debug, Clone, Serialize, Object)]
 pub struct DeviceStatus {
     pub device_id: String,
     pub device_name: String,
@@ -17,7 +19,7 @@ pub struct DeviceStatus {
     pub config_read_only: bool,
     /// Whether an admin key is configured at all. False means every mutation is open.
     pub requires_auth: bool,
-    /// Whether the key this request carried was accepted. Lets the web UI show that a mutation
-    /// will be refused before the reader clicks it.
-    pub authenticated: bool,
+    /// What the key this request carried allows. Lets the web UI show that a mutation will be
+    /// refused before the reader clicks it.
+    pub access: Access,
 }

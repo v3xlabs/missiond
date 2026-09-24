@@ -8,7 +8,7 @@ use poem_openapi::{
 use crate::state::AppState;
 
 use super::{
-    auth::{is_authorized, Authorization},
+    auth::{Access, Authorization},
     ApiError, ApiResult, DeviceStatus,
 };
 
@@ -29,7 +29,7 @@ impl StatusApi {
             device_name: device.name,
             current_playlist_id: chrome.current_playlist_id.clone(),
             current_tab_id: chrome.current_tab_id.clone(),
-            auto_rotate: chrome.auto_rotate,
+            auto_rotate: chrome.auto_rotate(),
             screen_on: self.state.display.is_on(),
             brightness: self.state.display.brightness(),
             uptime_seconds: self.state.uptime_seconds(),
@@ -39,7 +39,7 @@ impl StatusApi {
                 .map(|since| since.as_secs()),
             config_read_only: self.state.config.is_read_only(),
             requires_auth: self.state.admin_key.is_some(),
-            authenticated: is_authorized(&self.state, &authorization),
+            access: Access::of(&self.state, authorization.0.as_deref()),
         }))
     }
 

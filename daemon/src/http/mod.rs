@@ -16,7 +16,11 @@ use poem::{
 use rust_embed::RustEmbed;
 use tracing::info;
 
-use crate::{api, state::AppState};
+use crate::{
+    api::{self, auth::Access},
+    events::{Catalogue, StateFrame},
+    state::AppState,
+};
 
 #[derive(RustEmbed)]
 #[folder = "web-dist"]
@@ -167,20 +171,66 @@ async fn preview_live(state: Data<&Arc<AppState>>, tab_id: Path<String>) -> impl
         .body(Body::from_bytes_stream(stream))
 }
 
+/// Two kinds of frame. `state` is what is on screen, sent on connect and whenever it changes.
+/// `catalogue` is every playlist and its tabs, sent on connect and whenever an edit changes it.
 #[handler]
-fn events(state: Data<&Arc<AppState>>) -> SSE {
-    let mut receiver = state.events.subscribe();
+fn events(state: Data<&Arc<AppState>>, request: &poem::Request) -> SSE {
+    let state = state.0.clone();
+    let requires_auth = state.admin_key.is_some();
+    let access = Access::of(&state, request.header("authorization"));
+    let mut display = state.events.subscribe();
+    let mut config = state.config.subscribe();
+
+    display.mark_changed();
+    config.mark_changed();
 
     SSE::new(async_stream::stream! {
+        let mut sent_catalogue = None;
+
         loop {
-            let event = receiver.borrow_and_update().clone();
+            let frame = tokio::select! {
+                biased;
 
-            if let Ok(payload) = serde_json::to_string(&event) {
-                yield Event::message(payload);
-            }
+                changed = display.changed() => {
+                    if changed.is_err() {
+                        break;
+                    }
 
-            if receiver.changed().await.is_err() {
-                break;
+                    let display = display.borrow_and_update().clone();
+
+                    serde_json::to_string(&StateFrame {
+                        display: &display,
+                        requires_auth,
+                        access,
+                    })
+                    .ok()
+                    .map(|payload| Event::message(payload).event_type("state"))
+                }
+                changed = config.changed() => {
+                    if changed.is_err() {
+                        break;
+                    }
+
+                    config.borrow_and_update();
+
+                    let catalogue = Catalogue::from(&state.config.read().await);
+
+                    if sent_catalogue.as_ref() == Some(&catalogue) {
+                        None
+                    } else {
+                        let frame = serde_json::to_string(&catalogue)
+                            .ok()
+                            .map(|payload| Event::message(payload).event_type("catalogue"));
+
+                        sent_catalogue = Some(catalogue);
+
+                        frame
+                    }
+                }
+            };
+
+            if let Some(frame) = frame {
+                yield frame;
             }
         }
     })

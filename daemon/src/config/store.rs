@@ -2,10 +2,10 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::sync::RwLock;
+use tokio::sync::{watch, RwLock};
 use tracing::{info, warn};
 
-use super::{Dirs, Document, Documents, Persisted, Playlist, Tab};
+use super::{DeviceDocument, Dirs, Document, Documents, Persisted, Playlist, Tab};
 
 /// The config directory is the source of truth. When Nix generates it, the directory is a store
 /// path and every write fails, so the store reports itself as read-only and the API applies
@@ -14,6 +14,8 @@ pub struct ConfigStore {
     pub dirs: Dirs,
     read_only: bool,
     inner: RwLock<Documents>,
+    /// Bumped by every mutation, so a reader can wait for configuration to change.
+    revision: watch::Sender<u64>,
 }
 
 impl ConfigStore {
@@ -45,6 +47,7 @@ impl ConfigStore {
             dirs,
             read_only,
             inner: RwLock::new(config),
+            revision: watch::channel(0).0,
         })
     }
 
@@ -54,6 +57,14 @@ impl ConfigStore {
 
     pub async fn read(&self) -> Documents {
         self.inner.read().await.clone()
+    }
+
+    pub fn subscribe(&self) -> watch::Receiver<u64> {
+        self.revision.subscribe()
+    }
+
+    pub async fn device(&self) -> DeviceDocument {
+        self.inner.read().await.device.clone()
     }
 
     pub async fn tabs(&self) -> Vec<Tab> {
@@ -117,6 +128,7 @@ impl ConfigStore {
         let mut config = self.inner.write().await;
 
         change(&mut config);
+        self.revision.send_modify(|revision| *revision += 1);
 
         if self.read_only {
             return Ok(Persisted::MemoryOnly);
@@ -144,6 +156,10 @@ impl ConfigStore {
             .admin_key
             .as_ref()
             .map(|key| key.export("MISSIOND_ADMIN_KEY"));
+        device.control_key = device
+            .control_key
+            .as_ref()
+            .map(|key| key.export("MISSIOND_CONTROL_KEY"));
 
         if let Some(hass) = device.homeassistant.as_mut() {
             hass.password = hass

@@ -21,9 +21,9 @@ impl ApiError {
         }))
     }
 
-    pub fn unauthorized() -> Self {
+    pub fn unauthorized(required: &str) -> Self {
         Self::Unauthorized(Json(ErrorBody {
-            message: "a valid admin key is required".to_string(),
+            message: format!("a valid {required} is required"),
         }))
     }
 

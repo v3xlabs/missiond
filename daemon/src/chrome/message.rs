@@ -9,6 +9,8 @@ pub enum ChromeMessage {
     },
     Pause,
     Resume,
+    /// Pause when rotating, resume when paused.
+    ToggleRotation,
     NextTab,
     PreviousTab,
     RefreshTab {

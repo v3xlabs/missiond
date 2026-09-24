@@ -58,7 +58,7 @@ export const StatusBar: FC = () => {
         </button>
       </div>
 
-      <AdminKeyField requiresAuth={status.requires_auth} authenticated={status.authenticated} />
+      <AdminKeyField requiresAuth={status.requires_auth} access={status.access} />
     </header>
   );
 };

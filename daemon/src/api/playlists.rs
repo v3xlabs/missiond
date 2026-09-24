@@ -9,7 +9,7 @@ use crate::{
 };
 
 use super::{
-    auth::{authorize, Authorization},
+    auth::{authorize, authorize_control, Authorization},
     ApiError, ApiResult, CreatePlaylistRequest, MutationResult, PlaylistInfo, ReorderRequest,
     SetEnabledRequest, TabInfo,
 };
@@ -142,7 +142,7 @@ impl PlaylistApi {
         playlist_id: Path<String>,
         authorization: Authorization,
     ) -> ApiResult<Json<MutationResult>> {
-        authorize(&self.state, &authorization)?;
+        authorize_control(&self.state, &authorization)?;
 
         tell(
             &self.state.chrome,
@@ -167,7 +167,7 @@ impl PlaylistApi {
         tab_id: Path<String>,
         authorization: Authorization,
     ) -> ApiResult<Json<MutationResult>> {
-        authorize(&self.state, &authorization)?;
+        authorize_control(&self.state, &authorization)?;
 
         tell(
             &self.state.chrome,

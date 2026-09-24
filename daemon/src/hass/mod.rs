@@ -212,6 +212,8 @@ impl HassManager {
             if let Some(client) = &self.client {
                 self.brightness_entity.update_state(client, payload).await;
             }
+
+            app_state.events.publish(app_state).await;
         } else if topic == self.playlist_entity.command_topic {
             if let Err(error) = tell(
                 &app_state.chrome,
