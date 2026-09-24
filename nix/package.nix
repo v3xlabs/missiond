@@ -33,7 +33,7 @@ rustPlatform.buildRustPackage {
     version = "0.0.1";
     src = ../web;
     fetcherVersion = 4;
-    hash = "sha256-011TMMgGTeyj5pfHkTS3s5MQ8awFT5esN4K/eL8qz8g=";
+    hash = "sha256-RzYZMUJJOFE30YxtM9KUAi2PR2y2bFqEn9K87aW5LhU=";
   };
 
   nativeBuildInputs = [
