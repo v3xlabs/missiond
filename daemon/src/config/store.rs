@@ -181,6 +181,17 @@ impl ConfigStore {
             calendar.url = calendar.url.export(&placeholder);
         }
 
+        let mut notifications = config.notifications.clone();
+
+        for (name, webhook) in &mut notifications.webhooks {
+            let placeholder = format!("MISSIOND_WEBHOOK_{}", name.to_uppercase().replace('-', "_"));
+
+            webhook.token = webhook
+                .token
+                .as_ref()
+                .map(|token| token.export(&placeholder));
+        }
+
         Ok([
             format!("# device.toml\n{}", toml::to_string_pretty(&device)?),
             format!(
@@ -194,7 +205,7 @@ impl ConfigStore {
             ),
             format!(
                 "# notifications.toml\n{}",
-                toml::to_string_pretty(&config.notifications)?
+                toml::to_string_pretty(&notifications)?
             ),
             format!("# calendars.toml\n{}", toml::to_string_pretty(&calendars)?),
         ]

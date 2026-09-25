@@ -6,13 +6,13 @@ use tracing::warn;
 use crate::{
     calendar,
     chrome::{tell, ChromeMessage, CALENDAR_TAB},
-    config::NotificationMode,
+    config::{HumanDuration, NotificationMode},
     notifications::Notification,
     state::AppState,
 };
 
 use super::{
-    auth::{authorize_control, Authorization},
+    auth::{authorize_control, authorize_webhook, Authorization},
     ApiError, ApiResult, CalendarState, MutationResult, NotifyRequest, SetSidebarModeRequest,
     SidebarState, StingerInfo,
 };
@@ -34,46 +34,37 @@ impl NotificationApi {
 
         let defaults = self.state.config.read().await.notifications;
         let (notification, duration) = request.0.into_notification(&defaults)?;
-        let mode = notification.mode;
-        let tab_id = notification.tab_id.clone();
-        let stinger = notification.stinger.clone();
 
-        self.state
-            .notifications
-            .push(notification, duration.into())
-            .await;
+        raise(&self.state, notification, duration).await;
 
-        if mode == NotificationMode::Takeover {
-            let state = self.state.clone();
+        Ok(Json(MutationResult::applied()))
+    }
 
-            tokio::spawn(async move {
-                if let Err(error) = tell(
-                    &state.chrome,
-                    ChromeMessage::Takeover {
-                        tab_id,
-                        stinger,
-                        seconds: Some(duration.seconds()),
-                    },
-                )
-                .await
-                {
-                    warn!("takeover failed: {error}");
+    /// Raise the alert a webhook in `notifications.toml` describes. The body is never read, so a
+    /// caller that posts its own payload, however large, works unchanged.
+    #[oai(path = "/webhooks/:name", method = "post")]
+    async fn webhook(
+        &self,
+        name: Path<String>,
+        authorization: Authorization,
+    ) -> ApiResult<Json<MutationResult>> {
+        let defaults = self.state.config.read().await.notifications;
+        let webhook = defaults.webhooks.get(&name.0);
 
-                    return;
-                }
+        // Authorized before the lookup, so an unknown name tells an unauthorized caller nothing.
+        authorize_webhook(
+            &self.state,
+            webhook.and_then(|webhook| webhook.token.as_ref()),
+            &authorization,
+        )?;
 
-                tokio::time::sleep(Duration::from(duration)).await;
+        let Some(webhook) = webhook else {
+            return Err(ApiError::not_found(format!("webhook {}", name.0)));
+        };
 
-                if state
-                    .notifications
-                    .current_in(NotificationMode::Takeover)
-                    .await
-                    .is_none()
-                {
-                    let _ = tell(&state.chrome, ChromeMessage::EndTakeover).await;
-                }
-            });
-        }
+        let (notification, duration) = webhook.notification(&name.0, &defaults);
+
+        raise(&self.state, notification, duration).await;
 
         Ok(Json(MutationResult::applied()))
     }
@@ -199,4 +190,51 @@ impl NotificationApi {
     async fn agenda(&self) -> ApiResult<Json<Vec<Notification>>> {
         Ok(Json(calendar::agenda(&self.state).await))
     }
+}
+
+/// Returns once the alert is queued. A takeover can take seconds and the caller is usually an
+/// automation, so it is not held open while the screen changes.
+async fn raise(state: &Arc<AppState>, notification: Notification, duration: HumanDuration) {
+    let mode = notification.mode;
+    let tab_id = notification.tab_id.clone();
+    let stinger = notification.stinger.clone();
+
+    state
+        .notifications
+        .push(notification, duration.into())
+        .await;
+
+    if mode != NotificationMode::Takeover {
+        return;
+    }
+
+    let state = state.clone();
+
+    tokio::spawn(async move {
+        if let Err(error) = tell(
+            &state.chrome,
+            ChromeMessage::Takeover {
+                tab_id,
+                stinger,
+                seconds: Some(duration.seconds()),
+            },
+        )
+        .await
+        {
+            warn!("takeover failed: {error}");
+
+            return;
+        }
+
+        tokio::time::sleep(Duration::from(duration)).await;
+
+        if state
+            .notifications
+            .current_in(NotificationMode::Takeover)
+            .await
+            .is_none()
+        {
+            let _ = tell(&state.chrome, ChromeMessage::EndTakeover).await;
+        }
+    });
 }

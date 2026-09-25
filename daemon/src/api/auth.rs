@@ -1,7 +1,8 @@
 use poem_openapi::{param::Header, Enum};
 use serde::Serialize;
+use tracing::warn;
 
-use crate::state::AppState;
+use crate::{config::SecretRef, state::AppState};
 
 use super::{ApiError, ApiResult};
 
@@ -58,6 +59,37 @@ pub fn authorize_control(state: &AppState, presented: &Authorization) -> ApiResu
     match Access::of(state, presented.0.as_deref()) {
         Access::Admin | Access::Control => Ok(()),
         Access::None => Err(ApiError::unauthorized("admin or control key")),
+    }
+}
+
+/// A webhook with a token accepts that token as its bearer and nothing else, even when no admin
+/// key is configured: the token is the one credential its caller was given. A webhook without one
+/// is a control route like any other.
+pub fn authorize_webhook(
+    state: &AppState,
+    token: Option<&SecretRef>,
+    presented: &Authorization,
+) -> ApiResult<()> {
+    let Some(token) = token else {
+        return authorize_control(state, presented);
+    };
+
+    let expected = token.resolve().map_err(|error| {
+        warn!("cannot read a webhook token: {error:#}");
+
+        ApiError::internal("the webhook token cannot be read")
+    })?;
+
+    let presented = presented
+        .0
+        .as_deref()
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .unwrap_or_default();
+
+    if constant_time_eq(presented.as_bytes(), expected.as_bytes()) {
+        Ok(())
+    } else {
+        Err(ApiError::unauthorized("webhook token"))
     }
 }
 
