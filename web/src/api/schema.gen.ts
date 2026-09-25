@@ -1032,8 +1032,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Put a tab on screen without naming a playlist, and hold it there. The tab plays within the
-         *     current playlist when that has it, otherwise within the first playlist that does. */
+        /**
+         * Put a tab on screen without naming a playlist, and hold it there. The tab plays within the
+         *     current playlist when that has it, otherwise within the first playlist that does.
+         */
         post: {
             parameters: {
                 query?: never;
@@ -2153,8 +2155,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Open the rail if it is closed, close it if it is open. A rail closed this way stays closed
-         *     until something new arrives for it. */
+        /**
+         * Pin the rail open if it is closed, closed if it is open. It stays that way until the mode is
+         *     set back to `auto`.
+         */
         post: {
             parameters: {
                 query?: never;
@@ -2221,7 +2225,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Whether the rail is up. */
+        /** Whether the rail is up, and who decides that. */
         get: {
             parameters: {
                 query?: never;
@@ -2273,7 +2277,64 @@ export interface paths {
                 };
             };
         };
-        put?: never;
+        /** Pin the rail open or closed, or hand it back to the notifications with `auto`. */
+        put: {
+            parameters: {
+                query?: never;
+                header?: {
+                    authorization?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["SetSidebarModeRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["SidebarState"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
         post?: never;
         delete?: never;
         options?: never;
@@ -2290,8 +2351,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Put the full-screen agenda on the display, or take it away and resume the playlist. The
-         *     hold has no end: the agenda stays until the second call. */
+        /**
+         * Put the full-screen agenda on the display, or take it away and resume the playlist. The
+         *     hold has no end: the agenda stays until the second call.
+         */
         post: {
             parameters: {
                 query?: never;
@@ -2454,15 +2517,20 @@ export interface components {
             brightness: number;
             /** Format: uint64 */
             uptime_seconds: number;
+            sidebar: components["schemas"]["SidebarState"];
             /** Format: uint64 */
             current_tab_opened_at?: number;
-            /** @description True when the config directory is managed elsewhere, so a change made here applies now
-             *     but does not survive a restart. */
+            /**
+             * @description True when the config directory is managed elsewhere, so a change made here applies now
+             *     but does not survive a restart.
+             */
             config_read_only: boolean;
             /** @description Whether an admin key is configured at all. False means every mutation is open. */
             requires_auth: boolean;
-            /** @description What the key this request carried allows. Lets the web UI show that a mutation will be
-             *     refused before the reader clicks it. */
+            /**
+             * @description What the key this request carried allows. Lets the web UI show that a mutation will be
+             *     refused before the reader clicks it.
+             */
             access: components["schemas"]["Access"] & unknown;
         };
         /** ErrorBody */
@@ -2492,8 +2560,10 @@ export interface components {
         Notification: {
             /** Format: uint64 */
             notification_id: number;
-            /** @description Two pushes carrying one key are one alert said twice. A calendar poll re-derives the same
-             *     occurrence every cycle, and this is what stops that becoming a second card. */
+            /**
+             * @description Two pushes carrying one key are one alert said twice. A calendar poll re-derives the same
+             *     occurrence every cycle, and this is what stops that becoming a second card.
+             */
             key?: string;
             title: string;
             body?: string;
@@ -2514,8 +2584,10 @@ export interface components {
             ends_at?: string;
             location?: string;
             meeting?: components["schemas"]["Meeting"];
-            /** @description A tab to put on screen instead of a message card, so an alert about a camera shows the
-             *     stream rather than a sentence describing it. */
+            /**
+             * @description A tab to put on screen instead of a message card, so an alert about a camera shows the
+             *     stream rather than a sentence describing it.
+             */
             tab_id?: string;
             /** @description A clip played while the alert arrives, by name from `notifications.toml`. */
             stinger?: string;
@@ -2534,8 +2606,10 @@ export interface components {
             mode?: components["schemas"]["NotificationMode"] & unknown;
             /** @description A duration such as `20s`. Falls back to the configured default. */
             duration?: string;
-            /** @description Two calls carrying one key are one alert said twice: the second replaces the first rather
-             *     than stacking beside it. */
+            /**
+             * @description Two calls carrying one key are one alert said twice: the second replaces the first rather
+             *     than stacking beside it.
+             */
             key?: string;
             /**
              * Format: date-time
@@ -2569,8 +2643,10 @@ export interface components {
         };
         /** ReorderRequest */
         ReorderRequest: {
-            /** @description The playlist's tabs, in the order they should play. It must hold exactly the tabs the
-             *     playlist already has, so a stale browser cannot silently drop one. */
+            /**
+             * @description The playlist's tabs, in the order they should play. It must hold exactly the tabs the
+             *     playlist already has, so a stale browser cannot silently drop one.
+             */
             tab_ids: string[];
         };
         /**
@@ -2592,12 +2668,23 @@ export interface components {
         SetEnabledRequest: {
             enabled: boolean;
         };
+        /** SetSidebarModeRequest */
+        SetSidebarModeRequest: {
+            mode: components["schemas"]["SidebarMode"];
+        };
+        /**
+         * @description Who decides whether the rail is up. `Open` and `Closed` hold until the mode goes back to
+         *     `Auto`, whatever arrives in the meantime.
+         * @enum {string}
+         */
+        SidebarMode: "auto" | "open" | "closed";
         /**
          * SidebarState
-         * @description Where the rail ended up, so a caller that toggled it does not have to ask again.
+         * @description Where the rail ended up, so a caller that changed it does not have to ask again.
          */
         SidebarState: {
             open: boolean;
+            mode: components["schemas"]["SidebarMode"];
         };
         /**
          * StingerInfo
@@ -2612,8 +2699,10 @@ export interface components {
         TabInfo: {
             tab_id: string;
             name: string;
-            /** @description The page address. Absent for a camera, whose stream url is a credential and never leaves
-             *     the daemon. */
+            /**
+             * @description The page address. Absent for a camera, whose stream url is a credential and never leaves
+             *     the daemon.
+             */
             url?: string;
             /** Format: uint64 */
             order_index: number;

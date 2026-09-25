@@ -1,14 +1,17 @@
 import { FiChevronLeft, FiChevronRight, FiMonitor, FiPause, FiPlay } from "solid-icons/fi";
+import { TbOutlineLayoutSidebarRightCollapse, TbOutlineLayoutSidebarRightExpand } from "solid-icons/tb";
 import { Errored, Loading, Show, useContext } from "solid-js";
 
 import type { PlaybackAction } from "../api/display";
-import { playback, setScreenPower } from "../api/display";
+import { playback, setScreenPower, setSidebarMode } from "../api/display";
 import { DisplayContext } from "../app/display";
 import { SECONDARY_BUTTON, SECTION_HEADING } from "./controls";
 import { RegionFailure, RegionPending } from "./Region";
 import { ScreenPanel } from "./ScreenPanel";
 
 const SEGMENT = "flex size-7 items-center justify-center rounded-[calc(var(--radius-control)-2px)] text-slate-600 hover:bg-surface hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100";
+
+const TEXT_SEGMENT = "flex h-7 items-center rounded-[calc(var(--radius-control)-2px)] px-2 text-xs font-medium text-slate-600 hover:bg-surface hover:text-slate-900 aria-pressed:bg-surface aria-pressed:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 dark:aria-pressed:text-slate-100";
 
 const Status = () => {
   const display = useContext(DisplayContext);
@@ -83,6 +86,41 @@ const Status = () => {
             class={SEGMENT}
           >
             <FiChevronRight size={16} aria-hidden="true" />
+          </button>
+        </div>
+        <div role="group" aria-label="Sidebar" class="inline-flex rounded-control bg-raised p-0.5">
+          <Show
+            when={display.status().sidebar.open}
+            fallback={(
+              <button
+                type="button"
+                onClick={() => void display.change(async () => setSidebarMode("open"), ["status"])}
+                aria-label="Expand the sidebar"
+                title="Expand the sidebar"
+                class={SEGMENT}
+              >
+                <TbOutlineLayoutSidebarRightExpand size={16} aria-hidden="true" />
+              </button>
+            )}
+          >
+            <button
+              type="button"
+              onClick={() => void display.change(async () => setSidebarMode("closed"), ["status"])}
+              aria-label="Collapse the sidebar"
+              title="Collapse the sidebar"
+              class={SEGMENT}
+            >
+              <TbOutlineLayoutSidebarRightCollapse size={16} aria-hidden="true" />
+            </button>
+          </Show>
+          <button
+            type="button"
+            onClick={() => void display.change(async () => setSidebarMode("auto"), ["status"])}
+            aria-pressed={display.status().sidebar.mode === "auto" ? "true" : "false"}
+            title="Let notifications and the calendar open and close the sidebar"
+            class={TEXT_SEGMENT}
+          >
+            Auto
           </button>
         </div>
         <button

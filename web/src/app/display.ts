@@ -1,6 +1,8 @@
 import type { SourceAccessor } from "solid-js";
 import { createContext, createMemo, onSettled, refresh } from "solid-js";
 
+import type { StingerInfo } from "../api/alerts";
+import { listStingers } from "../api/alerts";
 import { baseUrl } from "../api/api";
 import type { DeviceStatus } from "../api/display";
 import { getStatus } from "../api/display";
@@ -19,6 +21,7 @@ export type Display = {
   /** Each playlist's tabs in play order, by playlist id. */
   playlistTabs: SourceAccessor<ReadonlyMap<string, readonly TabInfo[]>>;
   tabs: SourceAccessor<readonly TabInfo[]>;
+  stingers: SourceAccessor<readonly StingerInfo[]>;
   /** Runs a write and refetches what it changed. A failure comes back for the caller to show. */
   apply: (write: () => Promise<Outcome>, affected: readonly Source[]) => Promise<Outcome>;
   /** Like `apply`, for a control with no place of its own to say it failed, so a failure becomes a notice. */
@@ -34,6 +37,7 @@ export const createDisplay = (): Display => {
   const status = createMemo(() => getStatus());
   const playlists = createMemo(() => listPlaylists());
   const tabs = createMemo(() => listTabs());
+  const stingers = createMemo(() => listStingers());
 
   // Activating a playlist refetches the list, but only a playlist coming or going changes whose
   // tabs there are to load.
@@ -80,5 +84,5 @@ export const createDisplay = (): Display => {
     if (!result.ok) notify(result.message);
   };
 
-  return { status, playlists, playlistTabs, tabs, apply, change };
+  return { status, playlists, playlistTabs, tabs, stingers, apply, change };
 };

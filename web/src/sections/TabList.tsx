@@ -1,9 +1,9 @@
-import { FiTrash2 } from "solid-icons/fi";
+import { FiPlay, FiTrash2 } from "solid-icons/fi";
 import { Errored, For, Loading, Show, useContext } from "solid-js";
 
-import { deleteTab } from "../api/tabs";
+import { deleteTab, showTab } from "../api/tabs";
 import { DisplayContext } from "../app/display";
-import { DANGER_ICON_BUTTON, EMPTY_PANEL, SECTION_HEADING } from "../components/controls";
+import { DANGER_ICON_BUTTON, EMPTY_PANEL, ICON_BUTTON, SECTION_HEADING } from "../components/controls";
 import { RegionFailure, RegionPending } from "../components/Region";
 
 /**
@@ -25,6 +25,16 @@ export const TabList = () => {
                   <li class="flex items-center gap-4 px-4 py-2.5">
                     <span class="w-56 shrink-0 truncate text-sm font-medium text-slate-900 dark:text-slate-100">{tab().name}</span>
                     <span class="min-w-0 flex-1 truncate text-xs text-slate-500 dark:text-slate-500">{tab().url ?? "Camera"}</span>
+                    <button
+                      type="button"
+                      onClick={() => void display.change(async () => showTab(tab().tab_id), ["status"])}
+                      disabled={display.status().current_tab_id === tab().tab_id}
+                      aria-label={`Show ${tab().name} on screen`}
+                      title="Show on screen until rotation resumes"
+                      class={ICON_BUTTON}
+                    >
+                      <FiPlay size={14} aria-hidden="true" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => void display.change(async () => deleteTab(tab().tab_id), ["tabs", "playlistTabs", "playlists"])}

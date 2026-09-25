@@ -3,6 +3,7 @@ import { failure, outcome } from "./request";
 import type { components } from "./schema.gen";
 
 export type DeviceStatus = components["schemas"]["DeviceStatus"];
+export type SidebarMode = components["schemas"]["SidebarMode"];
 
 const PLAYBACK_PATHS = {
   next: "/playback/next",
@@ -28,3 +29,9 @@ export const playback = async (action: PlaybackAction) =>
 
 export const setScreenPower = async (isOn: boolean) =>
   outcome(await apiRequest("/display/power/{on}", "post", { path: { on: isOn } }));
+
+export const setSidebarMode = async (mode: SidebarMode) =>
+  outcome(await apiRequest("/sidebar", "put", {
+    contentType: "application/json; charset=utf-8",
+    data: { mode },
+  }));

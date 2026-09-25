@@ -50,6 +50,7 @@ impl Events {
             next_rotation_at: chrome.next_rotation_at(),
             screen_on: app_state.display.is_on(),
             brightness: app_state.display.brightness(),
+            sidebar: app_state.surfaces.sidebar_state().await,
         };
 
         self.sender.send_if_modified(|current| {

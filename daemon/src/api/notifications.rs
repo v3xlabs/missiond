@@ -13,7 +13,8 @@ use crate::{
 
 use super::{
     auth::{authorize_control, Authorization},
-    ApiError, ApiResult, CalendarState, MutationResult, NotifyRequest, SidebarState, StingerInfo,
+    ApiError, ApiResult, CalendarState, MutationResult, NotifyRequest, SetSidebarModeRequest,
+    SidebarState, StingerInfo,
 };
 
 pub struct NotificationApi {
@@ -125,23 +126,36 @@ impl NotificationApi {
         Ok(Json(MutationResult::applied()))
     }
 
-    /// Open the rail if it is closed, close it if it is open. A rail closed this way stays closed
-    /// until something new arrives for it.
+    /// Pin the rail open if it is closed, closed if it is open. It stays that way until the mode is
+    /// set back to `auto`.
     #[oai(path = "/sidebar/toggle", method = "post")]
     async fn toggle_sidebar(&self, authorization: Authorization) -> ApiResult<Json<SidebarState>> {
         authorize_control(&self.state, &authorization)?;
 
-        let open = self.state.surfaces.toggle_sidebar(&self.state).await;
-
-        Ok(Json(SidebarState { open }))
+        Ok(Json(self.state.surfaces.toggle_sidebar(&self.state).await))
     }
 
-    /// Whether the rail is up.
+    /// Pin the rail open or closed, or hand it back to the notifications with `auto`.
+    #[oai(path = "/sidebar", method = "put")]
+    async fn set_sidebar_mode(
+        &self,
+        request: Json<SetSidebarModeRequest>,
+        authorization: Authorization,
+    ) -> ApiResult<Json<SidebarState>> {
+        authorize_control(&self.state, &authorization)?;
+
+        Ok(Json(
+            self.state
+                .surfaces
+                .set_sidebar_mode(request.0.mode, &self.state)
+                .await,
+        ))
+    }
+
+    /// Whether the rail is up, and who decides that.
     #[oai(path = "/sidebar", method = "get")]
     async fn sidebar(&self) -> ApiResult<Json<SidebarState>> {
-        Ok(Json(SidebarState {
-            open: self.state.surfaces.sidebar.is_open().await,
-        }))
+        Ok(Json(self.state.surfaces.sidebar_state().await))
     }
 
     /// Put the full-screen agenda on the display, or take it away and resume the playlist. The

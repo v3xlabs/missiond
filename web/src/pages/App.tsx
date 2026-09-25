@@ -3,6 +3,7 @@ import { Header } from "../components/Header";
 import { Notices } from "../components/Notices";
 import { NowPlaying } from "../components/NowPlaying";
 import { PlaylistList } from "../sections/PlaylistList";
+import { StingerList } from "../sections/StingerList";
 import { TabList } from "../sections/TabList";
 
 export const App = () => {
@@ -17,6 +18,7 @@ export const App = () => {
           <NowPlaying />
           <PlaylistList />
           <TabList />
+          <StingerList />
         </main>
         <Notices />
       </div>

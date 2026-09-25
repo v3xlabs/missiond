@@ -24,6 +24,10 @@ export const upsertTab = async (tabId: string, tab: components["schemas"]["Upser
 export const deleteTab = async (tabId: string) =>
   outcome(await apiRequest("/tabs/{tab_id}", "delete", { path: { tab_id: tabId } }));
 
+/** Puts the tab on screen and holds it there until rotation resumes. A camera outside every playlist plays within the current one. */
+export const showTab = async (tabId: string) =>
+  outcome(await apiRequest("/tabs/{tab_id}/activate", "post", { path: { tab_id: tabId } }));
+
 export const refreshTab = async (tabId: string) =>
   outcome(await apiRequest("/tabs/{tab_id}/refresh", "post", { path: { tab_id: tabId } }));
 

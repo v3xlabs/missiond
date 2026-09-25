@@ -32,6 +32,7 @@ impl StatusApi {
             auto_rotate: chrome.auto_rotate(),
             screen_on: self.state.display.is_on(),
             brightness: self.state.display.brightness(),
+            sidebar: self.state.surfaces.sidebar_state().await,
             uptime_seconds: self.state.uptime_seconds(),
             current_tab_opened_at: chrome
                 .current_tab_opened_at

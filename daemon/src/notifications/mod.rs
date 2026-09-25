@@ -1,6 +1,7 @@
 pub mod level;
 pub mod notification;
 pub mod sidebar;
+pub mod sidebar_mode;
 pub mod surface;
 pub mod surfaces;
 pub mod toast;
@@ -8,6 +9,7 @@ pub mod toast;
 pub use level::Level;
 pub use notification::Notification;
 pub use sidebar::Sidebar;
+pub use sidebar_mode::SidebarMode;
 pub use surface::Surface;
 pub use surfaces::Surfaces;
 pub use toast::Toast;
@@ -42,10 +44,6 @@ impl Notifications {
             next: Mutex::new(1),
             changed: watch::channel(0).0,
         }
-    }
-
-    pub async fn last_id(&self) -> u64 {
-        *self.next.lock().await - 1
     }
 
     pub fn subscribe(&self) -> watch::Receiver<u64> {

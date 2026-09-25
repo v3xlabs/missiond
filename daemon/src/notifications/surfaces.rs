@@ -3,21 +3,14 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::info;
 
-use crate::{config::NotificationMode, state::AppState};
+use crate::{api::SidebarState, config::NotificationMode, state::AppState};
 
-use super::{Sidebar, Toast};
+use super::{Sidebar, SidebarMode, Toast};
 
 pub struct Surfaces {
     pub sidebar: Sidebar,
     pub toast: Toast,
-    manual: Mutex<Option<Manual>>,
-}
-
-struct Manual {
-    open: bool,
-    /// The newest notification when the button was pressed. Anything newer supersedes the choice,
-    /// while an expiry does not, which is why this is an id rather than a change count.
-    after_id: u64,
+    sidebar_mode: Mutex<SidebarMode>,
 }
 
 impl Default for Surfaces {
@@ -31,36 +24,50 @@ impl Surfaces {
         Self {
             sidebar: Sidebar::new(),
             toast: Toast::new(),
-            manual: Mutex::new(None),
+            sidebar_mode: Mutex::new(SidebarMode::Auto),
         }
     }
 
-    pub async fn toggle_sidebar(&self, app_state: &Arc<AppState>) -> bool {
-        let open = !self.sidebar.is_open().await;
+    /// Pins the rail to the opposite of what is on screen now.
+    pub async fn toggle_sidebar(&self, app_state: &Arc<AppState>) -> SidebarState {
+        let mode = if self.sidebar.is_open().await {
+            SidebarMode::Closed
+        } else {
+            SidebarMode::Open
+        };
 
-        *self.manual.lock().await = Some(Manual {
-            open,
-            after_id: app_state.notifications.last_id().await,
-        });
+        self.set_sidebar_mode(mode, app_state).await
+    }
 
-        info!(open, "sidebar toggled by hand");
+    pub async fn set_sidebar_mode(
+        &self,
+        mode: SidebarMode,
+        app_state: &Arc<AppState>,
+    ) -> SidebarState {
+        *self.sidebar_mode.lock().await = mode;
+
+        info!(?mode, "sidebar mode set");
         self.reconcile(app_state).await;
 
-        open
+        self.sidebar_state().await
+    }
+
+    pub async fn sidebar_state(&self) -> SidebarState {
+        SidebarState {
+            open: self.sidebar.is_open().await,
+            mode: *self.sidebar_mode.lock().await,
+        }
     }
 
     pub async fn reconcile(&self, app_state: &Arc<AppState>) {
         let active = app_state.notifications.active().await;
 
-        let newest_sidebar = active
-            .iter()
-            .filter(|notification| notification.mode == NotificationMode::Sidebar)
-            .map(|notification| notification.notification_id)
-            .max();
-
-        let wanted = match self.manual.lock().await.as_ref() {
-            Some(manual) if newest_sidebar.is_none_or(|id| id <= manual.after_id) => manual.open,
-            _ => newest_sidebar.is_some(),
+        let wanted = match *self.sidebar_mode.lock().await {
+            SidebarMode::Open => true,
+            SidebarMode::Closed => false,
+            SidebarMode::Auto => active
+                .iter()
+                .any(|notification| notification.mode == NotificationMode::Sidebar),
         };
 
         match (wanted, self.sidebar.is_open().await) {
@@ -78,6 +85,8 @@ impl Surfaces {
             (false, true) => self.toast.close(app_state).await,
             _ => {}
         }
+
+        app_state.events.publish(app_state).await;
     }
 
     pub async fn shutdown(&self, app_state: &Arc<AppState>) {
