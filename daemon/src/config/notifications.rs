@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use super::{version, HumanDuration, NotificationMode, Stinger};
+use super::{version, HumanDuration, NotificationMode, Stinger, Webhook};
 
 /// `notifications.toml`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -24,6 +24,9 @@ pub struct NotificationsDocument {
     /// Named clips a tab or a notification can ask for.
     #[serde(default)]
     pub stingers: HashMap<String, Stinger>,
+    /// Alerts a caller raises by name, keyed by the name in `/api/webhooks/:name`.
+    #[serde(default)]
+    pub webhooks: HashMap<String, Webhook>,
 }
 
 fn default_duration() -> HumanDuration {
@@ -52,6 +55,7 @@ impl Default for NotificationsDocument {
             toast_width: default_toast_width(),
             toast_height: default_toast_height(),
             stingers: HashMap::new(),
+            webhooks: HashMap::new(),
         }
     }
 }

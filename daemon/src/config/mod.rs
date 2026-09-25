@@ -24,6 +24,7 @@ pub mod store;
 pub mod tab;
 pub mod tabs;
 pub mod version;
+pub mod webhook;
 pub mod weekday;
 
 pub use calendar::Calendar;
@@ -51,4 +52,5 @@ pub use stinger::Stinger;
 pub use store::ConfigStore;
 pub use tab::Tab;
 pub use tabs::TabsDocument;
+pub use webhook::Webhook;
 pub use weekday::Weekday;

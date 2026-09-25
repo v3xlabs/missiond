@@ -14,6 +14,7 @@ Features:
 - Poweroff, reboot and suspend over logind
 - Home Assistant MQTT discovery for the screen, the playlist and the tab
 - iCalendar feeds on a rail beside the content, with a toast before each meeting
+- Webhooks that raise a preset alert, such as a doorbell press that puts the camera on screen
 - A web UI with live previews, driven by a server sent event stream
 - An OpenAPI-documented REST API
 - A NixOS module that declares the whole configuration

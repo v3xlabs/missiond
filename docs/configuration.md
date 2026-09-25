@@ -294,7 +294,8 @@ admin_key = "inline-is-permitted"             # discouraged
 
 Resolution happens once, at start. A missing variable or an unreadable file stops the daemon with
 a readable message rather than starting it with an empty credential, because a display daemon that
-silently accepts every request is worse than one that does not start.
+silently accepts every request is worse than one that does not start. A webhook token is the
+exception: it is read on each call, and a call whose token cannot be read is refused.
 
 **An export never contains an inline secret.** `GET /api/config/export` replaces an inline value
 with a reference placeholder derived from the field, so the exported document is directly usable
@@ -330,6 +331,7 @@ screen, and none of them edits configuration or powers the machine off.
 | POST | `/api/display/power/toggle` | control | Turn the screen off or on. Answers `{"screen_on": ...}`. |
 | PUT | `/api/display/brightness` | control | Set panel brightness over DDC. |
 | POST | `/api/notify`, DELETE `/api/notifications/:id` | control | Raise or dismiss an alert. |
+| POST | `/api/webhooks/:name` | control, or the webhook's token | Raise the alert a webhook describes. See [Webhooks](#webhooks). |
 | POST | `/api/sidebar/toggle`, `/api/calendar/toggle` | control | Toggle the rail or the full-screen agenda. |
 | PUT | `/api/sidebar` | control | Pin the rail open or closed, or hand it back to the notifications. |
 | POST | `/api/system/{poweroff,reboot,suspend}` | admin | Power actions over logind. |
@@ -430,6 +432,7 @@ max_duration = "2s"
 | `sidebar_width` | integer | How wide the rail is, in logical pixels. The daemon narrows the display by this much and gives the column the remainder. |
 | `toast_width`, `toast_height` | integer | The size of the toast window, in logical pixels. |
 | `stingers` | table | Named clips, keyed by the name a tab or an alert refers to. |
+| `webhooks` | table | Named alerts a caller raises by URL. See [Webhooks](#webhooks). |
 
 ### takeover, sidebar and toast
 
@@ -585,9 +588,51 @@ curl -X POST http://display.example:3000/api/notify \
 The call returns as soon as the alert is queued. A transition can take seconds and the caller is
 usually an automation, so it is not held open while the screen changes.
 
+### Webhooks
+
+A webhook is an alert written down in advance, raised by a request that carries nothing but its
+name. It is for a service that can call a URL when something happens but cannot shape the
+request: a doorbell, an alarm panel, a monitoring system.
+
+```toml
+[webhooks.doorbell]
+token = { file = "/run/secrets/doorbell-webhook" }
+title = "Someone is at the door"
+level = "warning"
+mode = "takeover"
+tab_id = "entrance-camera"
+stinger = "doorbell"
+duration = "30s"
+```
+
+```bash
+curl -X POST http://display.example:3000/api/webhooks/doorbell \
+  -H "authorization: Bearer $DOORBELL_WEBHOOK_TOKEN"
+```
+
+| Field | Notes |
+| --- | --- |
+| `token` | A [secret](#secrets). The bearer this webhook accepts. Optional. |
+| `title`, `body`, `level`, `mode`, `tab_id`, `stinger`, `duration` | As for [raising an alert](#raising-an-alert). |
+
+The request body is never read, so a caller that posts its own payload works unchanged. The call
+answers once the alert is queued, as `/api/notify` does.
+
+A webhook with a `token` accepts that token as its bearer and nothing else, not even the admin
+key, and it does so whether or not an admin key is configured. That gives the caller one
+credential that raises one alert. A webhook without a `token` is a control route: it needs the
+admin or control key when an admin key is configured, and nothing otherwise.
+
+Each webhook's alert carries the key `webhook:<name>`, so a doorbell pressed twice replaces its
+alert and restarts its duration rather than stacking a second one.
+
+An export replaces an inline token with `MISSIOND_WEBHOOK_<NAME>`, the name upper-cased with `-`
+as `_`.
+
 | Method | Path | Does |
 | --- | --- | --- |
 | POST | `/api/notify` | Raise an alert. |
+| POST | `/api/webhooks/:name` | Raise the alert a webhook describes. |
 | GET | `/api/notifications` | What is currently showing. |
 | GET | `/api/notifications/stream` | The same list as a server sent event stream. The alert pages read this. |
 | DELETE | `/api/notifications/:notification_id` | Clear one early. |
