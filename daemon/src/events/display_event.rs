@@ -1,6 +1,8 @@
 use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 
+use crate::api::SidebarState;
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct DisplayEvent {
     pub device_id: String,
@@ -12,4 +14,5 @@ pub struct DisplayEvent {
     pub next_rotation_at: Option<u64>,
     pub screen_on: bool,
     pub brightness: u32,
+    pub sidebar: SidebarState,
 }

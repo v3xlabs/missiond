@@ -1,7 +1,7 @@
 use poem_openapi::Object;
 use serde::Serialize;
 
-use super::auth::Access;
+use super::{auth::Access, SidebarState};
 
 #[derive(Debug, Clone, Serialize, Object)]
 pub struct DeviceStatus {
@@ -13,6 +13,7 @@ pub struct DeviceStatus {
     pub screen_on: bool,
     pub brightness: u32,
     pub uptime_seconds: u64,
+    pub sidebar: SidebarState,
     pub current_tab_opened_at: Option<u64>,
     /// True when the config directory is managed elsewhere, so a change made here applies now
     /// but does not survive a restart.

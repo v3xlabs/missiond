@@ -89,7 +89,15 @@ impl Surface {
 
         *self.window.lock().await = Some(child);
 
-        let window_id = niri::wait_for_pid(pid).await?.id;
+        // A process with no window would count as open, and nothing would try to open it again.
+        let window_id = match niri::wait_for_pid(pid).await {
+            Ok(window) => window.id,
+            Err(error) => {
+                self.close().await;
+
+                return Err(error);
+            }
+        };
 
         info!(page, window_id, "surface window opened");
 

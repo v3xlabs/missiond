@@ -331,6 +331,7 @@ screen, and none of them edits configuration or powers the machine off.
 | PUT | `/api/display/brightness` | control | Set panel brightness over DDC. |
 | POST | `/api/notify`, DELETE `/api/notifications/:id` | control | Raise or dismiss an alert. |
 | POST | `/api/sidebar/toggle`, `/api/calendar/toggle` | control | Toggle the rail or the full-screen agenda. |
+| PUT | `/api/sidebar` | control | Pin the rail open or closed, or hand it back to the notifications. |
 | POST | `/api/system/{poweroff,reboot,suspend}` | admin | Power actions over logind. |
 
 Subscribing to a preview starts the capture, and dropping the subscription stops it, so a display
@@ -463,16 +464,22 @@ Chromium ignores `--class` on an `--app` window and derives an app id from the U
 window carries a name you chose. The daemon finds them by the process it started instead, which is
 exact and needs nothing configured.
 
-#### Toggling the rail
+#### Opening and closing the rail by hand
+
+The rail has a mode. `auto` is the default: the rail is up while a sidebar notification is active.
+`open` and `closed` pin it, whatever arrives, until the mode is set back to `auto`. The mode is not
+saved, so a restart returns to `auto`.
 
 ```bash
-curl -X POST http://display.example:3000/api/sidebar/toggle \
-  -H "authorization: Bearer $MISSIOND_ADMIN_KEY"
+curl -X PUT http://display.example:3000/api/sidebar \
+  -H "authorization: Bearer $MISSIOND_ADMIN_KEY" \
+  -H "content-type: application/json" \
+  -d '{"mode": "closed"}'
 ```
 
-One call, and the daemon decides which way. The answer says where it ended up, so a button
-somewhere else needs no state of its own. A rail closed by hand stays closed until something new
-arrives for it, rather than reopening on the next expiry.
+`POST /api/sidebar/toggle` pins the rail to the opposite of what is on screen, so a button somewhere
+else needs no state of its own. Both calls answer `{"open": ..., "mode": ...}`, and `/api/status`
+and the `state` event carry the same object as `sidebar`.
 
 ### Stingers
 
@@ -584,8 +591,9 @@ usually an automation, so it is not held open while the screen changes.
 | GET | `/api/notifications` | What is currently showing. |
 | GET | `/api/notifications/stream` | The same list as a server sent event stream. The alert pages read this. |
 | DELETE | `/api/notifications/:notification_id` | Clear one early. |
-| POST | `/api/sidebar/toggle` | Open the rail if it is closed, close it if it is open. |
-| GET | `/api/sidebar` | Whether the rail is up. |
+| POST | `/api/sidebar/toggle` | Pin the rail open if it is closed, closed if it is open. |
+| PUT | `/api/sidebar` | Set the mode: `{"mode": "auto" \| "open" \| "closed"}`. |
+| GET | `/api/sidebar` | Whether the rail is up, and its mode. |
 | POST | `/api/calendar/toggle` | Put the full-screen agenda on the display, or take it away. |
 | GET | `/api/calendar/agenda` | The entries the feeds put in their window. |
 | GET | `/api/stingers` | The configured clips, so the transition page can resolve a name. |
