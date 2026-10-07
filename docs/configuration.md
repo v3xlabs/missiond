@@ -669,7 +669,7 @@ file = "/run/secrets/work-ics"
 | `name` | string | What a message about the feed calls it. Defaults to the id. |
 | `url` | secret | Where the `.ics` is. See [Secrets](#secrets). |
 | `refresh` | duration | How often the daemon goes back to the network. |
-| `window` | duration | How far ahead the rail reaches, and how far recurrence expansion runs. |
+| `window` | duration | How far ahead feeds are read, and how far recurrence expansion runs. |
 | `leads` | list of durations | How long before an entry starts to raise a toast. One toast per lead. |
 | `toast_duration` | duration | How long each of those toasts stays up. |
 
@@ -680,6 +680,11 @@ with `MISSIOND_CALENDAR_<ID>` rather than printing it.
 `poll` and `refresh` are separate on purpose. The rail has to stay correct to the minute, because
 "in 3 minutes" is wrong a minute later, and asking a calendar server that often to learn something
 it has not changed would be rude and slower than reading what is already in memory.
+
+The sidebar and full-screen agenda show the next six hours on a linear time axis. Later entries
+appear in a separate list and do not compress the axis. Event height represents duration; short
+events have a narrow duration shape with their title beside it. Running meetings stay on the axis,
+with only their remaining duration shown.
 
 ### Meeting links
 

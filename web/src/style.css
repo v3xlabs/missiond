@@ -68,9 +68,7 @@ body {
   }
 }
 
-/* An entry on the rail's axis is as tall as its meeting is long, and a fifteen minute meeting has
-   room for a title and nothing else. What does not fit is dropped rather than sliced through the
-   middle of a line. */
+/* Short-event labels sit beside the duration shape and cannot enlarge it. */
 .rail-entry {
   container-type: size;
 }
@@ -82,5 +80,22 @@ body {
 @container (min-height: 3.2em) {
   .rail-entry-detail {
     display: flex;
+  }
+}
+
+@container (max-height: 2.6em) {
+  [data-rail-surface] {
+    width: 0.4em;
+    background-color: var(--color-slate-400);
+  }
+
+  [data-rail-surface][data-nearness="starting"] {
+    background-color: var(--color-amber-400);
+  }
+
+  [data-rail-label] {
+    left: 0.8em;
+    justify-content: center;
+    padding: 0;
   }
 }

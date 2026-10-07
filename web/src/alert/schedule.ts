@@ -20,8 +20,8 @@ const HOUR_MS = 60 * MINUTE_MS;
 const STARTING_MS = 5 * MINUTE_MS;
 const SOON_MS = HOUR_MS;
 
-/** Short enough to read, long enough that one short meeting does not fill the rail on its own. */
-const SHORTEST_SPAN_MS = 2 * HOUR_MS;
+/** Later entries stay off the axis so adding a distant meeting cannot compress the next six hours. */
+export const WINDOW_MS = 6 * HOUR_MS;
 
 export const timedOf = (alerts: readonly Alert[]): Timed[] =>
   alerts
@@ -32,7 +32,6 @@ export const timedOf = (alerts: readonly Alert[]): Timed[] =>
 
       const startsAt = new Date(alert.starts_at).getTime();
 
-      // An alert with no end is a moment rather than a span, and takes the height of one line.
       return [{
         alert,
         startsAt,
@@ -87,40 +86,24 @@ export const placed = (entries: readonly Timed[]): Placed[] => {
   return out;
 };
 
-export const spanOf = (entries: readonly Timed[], now: number) =>
-  Math.max(SHORTEST_SPAN_MS, ...entries.map(entry => entry.endsAt - now));
-
 export const percentOf = (at: number, from: number, spanMs: number) =>
   ((at - from) / spanMs) * 100;
 
-/**
- * Hour marks, thinned as the axis covers more of the day, so two labels never sit on each other.
- * The first mark of the day is dropped when it lands under the current time, which is written at
- * the top of the same gutter.
- */
+/** Keep the first hour label clear of the current-time label at the top of the gutter. */
 export const ticksOf = (from: number, spanMs: number): number[] => {
-  const step = stepHoursOf(spanMs);
   const clear = from + spanMs * 0.04;
   const ticks: number[] = [];
   const hour = new Date(from);
 
   hour.setMinutes(0, 0, 0);
 
-  for (let at = hour.getTime(); at < from + spanMs; at += HOUR_MS) {
-    if (at >= clear && new Date(at).getHours() % step === 0) {
+  for (let at = hour.getTime(); at <= from + spanMs; at += HOUR_MS) {
+    if (at >= clear) {
       ticks.push(at);
     }
   }
 
   return ticks;
-};
-
-const stepHoursOf = (spanMs: number) => {
-  if (spanMs <= 8 * HOUR_MS) {
-    return 1;
-  }
-
-  return spanMs <= 16 * HOUR_MS ? 2 : 3;
 };
 
 export const nearnessOf = (startsAt: number, now: number): Nearness => {
