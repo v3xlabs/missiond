@@ -4,7 +4,7 @@
   lib,
   nodejs,
   pkg-config,
-  pnpm,
+  pnpm_11,
   pnpmConfigHook,
   rustPlatform,
 }:
@@ -32,6 +32,7 @@ rustPlatform.buildRustPackage {
     pname = "missiond-web";
     version = "0.0.1";
     src = ../web;
+    pnpm = pnpm_11;
     fetcherVersion = 4;
     hash = "sha256-RzYZMUJJOFE30YxtM9KUAi2PR2y2bFqEn9K87aW5LhU=";
   };
@@ -40,7 +41,7 @@ rustPlatform.buildRustPackage {
     just
     nodejs
     pkg-config
-    pnpm
+    pnpm_11
     pnpmConfigHook
   ];
 
